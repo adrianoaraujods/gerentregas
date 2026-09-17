@@ -34,3 +34,10 @@ export class ConflictError extends TRPCError {
     this.name = "ConflictError";
   }
 }
+
+export class ValidationError extends TRPCError {
+  constructor(message: string) {
+    super({ code: "BAD_REQUEST", message });
+    this.name = "ValidationError";
+  }
+}
