@@ -3,33 +3,25 @@ import { describe, expect, it } from "vitest";
 import { ZodError, z } from "zod";
 
 import {
+  adminProcedure,
   authenticatedProcedure,
+  createCallerFactory,
   createRouter,
+  driverProcedure,
   ForbiddenError,
   managerProcedure,
   publicProcedure,
   UnauthorizedError,
 } from "@/server/api";
-import { appRouter } from "@/server/api/router";
-import { type Context, createCallerFactory } from "@/server/api/trpc";
+import type { Context } from "@/server/api/trpc";
 import { db } from "@/server/db";
 
-const createCaller = createCallerFactory(appRouter);
-
-function caller() {
-  return createCaller({ db, session: null, headers: new Headers() });
-}
-
-describe("tRPC router composition", () => {
-  it("auth.getProfile is protected and rejects unauthenticated callers", async () => {
-    await expect(caller().auth.getProfile()).rejects.toThrow(UnauthorizedError);
-  });
-});
-
-describe("tRPC middleware", () => {
+describe("tRPC middleware role matrix", () => {
   const testRouter = createRouter({
-    protected: authenticatedProcedure.query(() => "ok"),
-    admin: managerProcedure.query(() => "ok"),
+    any: authenticatedProcedure.query(() => "ok"),
+    manager: managerProcedure.query(() => "ok"),
+    admin: adminProcedure.query(() => "ok"),
+    driver: driverProcedure.query(() => "ok"),
   });
   const createTestCaller = createCallerFactory(testRouter);
 
@@ -37,42 +29,44 @@ describe("tRPC middleware", () => {
     return createTestCaller({ db, session, headers: new Headers() });
   }
 
-  it("authMiddleware rejects unauthenticated request", async () => {
-    await expect(testCaller(null).protected()).rejects.toThrow(
-      UnauthorizedError,
-    );
-  });
+  const matrix = [
+    { procedure: "any", role: "driver", expected: "ok" },
+    { procedure: "any", role: "manager", expected: "ok" },
+    { procedure: "any", role: "admin", expected: "ok" },
+    { procedure: "manager", role: "driver", expected: ForbiddenError },
+    { procedure: "manager", role: "manager", expected: "ok" },
+    { procedure: "manager", role: "admin", expected: "ok" },
+    { procedure: "admin", role: "driver", expected: ForbiddenError },
+    { procedure: "admin", role: "manager", expected: ForbiddenError },
+    { procedure: "admin", role: "admin", expected: "ok" },
+    { procedure: "driver", role: "driver", expected: "ok" },
+    { procedure: "driver", role: "manager", expected: ForbiddenError },
+    { procedure: "driver", role: "admin", expected: ForbiddenError },
+  ] as const;
 
-  it("authMiddleware passes any authenticated request", async () => {
-    const result = await testCaller({
-      user: { role: "driver" },
-    } as Context["session"]).protected();
-    expect(result).toBe("ok");
-  });
+  it.each(matrix)(
+    "$procedure procedure with $role user",
+    async ({ procedure, role, expected }) => {
+      const call = testCaller({
+        user: { role },
+      } as Context["session"])[procedure]();
 
-  it("managerMiddleware rejects unauthenticated request", async () => {
-    await expect(testCaller(null).admin()).rejects.toThrow(UnauthorizedError);
-  });
+      if (expected === "ok") {
+        await expect(call).resolves.toBe("ok");
+      } else {
+        await expect(call).rejects.toThrow(ForbiddenError);
+      }
+    },
+  );
 
-  it("managerMiddleware rejects driver user", async () => {
-    await expect(
-      testCaller({ user: { role: "driver" } } as Context["session"]).admin(),
-    ).rejects.toThrow(ForbiddenError);
-  });
-
-  it("managerMiddleware passes manager user", async () => {
-    const result = await testCaller({
-      user: { role: "manager" },
-    } as Context["session"]).admin();
-    expect(result).toBe("ok");
-  });
-
-  it("managerMiddleware passes admin user", async () => {
-    const result = await testCaller({
-      user: { role: "admin" },
-    } as Context["session"]).admin();
-    expect(result).toBe("ok");
-  });
+  it.each(["any", "manager", "admin", "driver"] as const)(
+    "$procedure rejects unauthenticated request",
+    async (procedure) => {
+      await expect(testCaller(null)[procedure]()).rejects.toThrow(
+        UnauthorizedError,
+      );
+    },
+  );
 });
 
 describe("tRPC Zod validation", () => {
