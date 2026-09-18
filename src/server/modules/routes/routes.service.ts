@@ -1,8 +1,4 @@
-import { and, eq, inArray } from "drizzle-orm";
 import { BadRequestError, ConflictError, NotFoundError } from "@/server/api";
-import type { Database } from "@/server/db";
-import { point } from "@/server/db/schemas/points";
-import { routeVersion, stopVersion } from "@/server/db/schemas/routes";
 
 import type { RoutesRepository } from "./routes.repository";
 import type {
@@ -17,10 +13,7 @@ import type {
 } from "./routes.types";
 
 export class RoutesService {
-  constructor(
-    private readonly repository: RoutesRepository,
-    private readonly db: Database,
-  ) {}
+  constructor(private readonly repository: RoutesRepository) {}
 
   async createRoute(
     input: CreateRouteInput,
@@ -50,10 +43,7 @@ export class RoutesService {
     }
 
     const pointIds = stops.map((s) => s.pointId);
-    const pointsData = await this.db
-      .select()
-      .from(point)
-      .where(inArray(point.id, pointIds));
+    const pointsData = await this.repository.findPointsByIds(pointIds);
     const pointsMap = new Map(pointsData.map((p) => [p.id, p]));
 
     for (const stopInput of stops) {
@@ -101,22 +91,18 @@ export class RoutesService {
       status: "draft",
     });
 
+    const routeVersionId = await this.repository.findRouteVersionId(
+      newRoute.id,
+      "1",
+    );
+    if (!routeVersionId) {
+      throw new BadRequestError("Falha ao buscar versão da rota.");
+    }
+
     for (const createdStop of createdStops) {
       await this.repository.createStopVersion({
         stopId: createdStop.id,
-        routeVersionId:
-          (
-            await this.db
-              .select({ id: routeVersion.id })
-              .from(routeVersion)
-              .where(
-                and(
-                  eq(routeVersion.routeId, newRoute.id),
-                  eq(routeVersion.version, "1"),
-                ),
-              )
-              .limit(1)
-          )[0]?.id ?? "",
+        routeVersionId,
         order: createdStop.order,
         pointId: createdStop.pointId,
         addressSnapshot: createdStop.addressSnapshot,
@@ -237,12 +223,8 @@ export class RoutesService {
       );
     }
 
-    const pointData = await this.db
-      .select()
-      .from(point)
-      .where(eq(point.id, input.pointId))
-      .limit(1);
-    if (!pointData[0]) {
+    const pointData = await this.repository.findPointById(input.pointId);
+    if (!pointData) {
       throw new NotFoundError("Ponto não encontrado.");
     }
 
@@ -275,9 +257,9 @@ export class RoutesService {
       routeId,
       pointId: input.pointId,
       order: newOrder,
-      addressSnapshot: pointData[0].address,
-      latitudeSnapshot: pointData[0].latitude,
-      longitudeSnapshot: pointData[0].longitude,
+      addressSnapshot: pointData.address,
+      latitudeSnapshot: pointData.latitude,
+      longitudeSnapshot: pointData.longitude,
     });
 
     if (!newStop) {
@@ -356,12 +338,8 @@ export class RoutesService {
     }
 
     if (input.pointId) {
-      const pointData = await this.db
-        .select()
-        .from(point)
-        .where(eq(point.id, input.pointId))
-        .limit(1);
-      if (!pointData[0]) {
+      const pointData = await this.repository.findPointById(input.pointId);
+      if (!pointData) {
         throw new NotFoundError("Ponto não encontrado.");
       }
     }
@@ -498,23 +476,11 @@ export class RoutesService {
   }
 
   async getRouteHistory(routeId: string) {
-    const versions = await this.db
-      .select()
-      .from(routeVersion)
-      .where(eq(routeVersion.routeId, routeId))
-      .orderBy(routeVersion.version);
+    const versions = await this.repository.findRouteVersions(routeId);
 
     const versionsWithStops = await Promise.all(
       versions.map(async (v) => {
-        const stops = await this.db
-          .select({
-            stopVersion: stopVersion,
-            point: point,
-          })
-          .from(stopVersion)
-          .leftJoin(point, eq(stopVersion.pointId, point.id))
-          .where(eq(stopVersion.routeVersionId, v.id))
-          .orderBy(stopVersion.order);
+        const stops = await this.repository.findStopVersionsWithPoints(v.id);
 
         return {
           ...v,

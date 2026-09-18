@@ -33,7 +33,7 @@ describe("RoutesService", () => {
         geocode: (address: string) => Promise<GeocodeResult | null>;
       },
     );
-    routesService = new RoutesService(routesRepository, db);
+    routesService = new RoutesService(routesRepository);
 
     mockGeocoder.geocode.mockResolvedValue({
       latitude: -23.5505,

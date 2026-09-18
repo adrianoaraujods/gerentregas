@@ -27,7 +27,7 @@ export class RoutesController {
   private readonly service: RoutesService;
 
   constructor(readonly db: Database) {
-    this.service = new RoutesService(new RoutesRepository(db), db);
+    this.service = new RoutesService(new RoutesRepository(db));
   }
 
   async createRoute(

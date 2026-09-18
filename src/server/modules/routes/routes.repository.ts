@@ -1,4 +1,4 @@
-import { and, count, desc, eq, isNull, sql } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import type { Database } from "@/server/db";
 import { point } from "@/server/db/schemas/points";
 import {
@@ -402,5 +402,56 @@ export class RoutesRepository {
       .where(and(...conditions))
       .limit(1);
     return !!row;
+  }
+
+  async findPointsByIds(pointIds: string[]) {
+    if (pointIds.length === 0) return [];
+    return this.db.select().from(point).where(inArray(point.id, pointIds));
+  }
+
+  async findPointById(pointId: string) {
+    const [row] = await this.db
+      .select()
+      .from(point)
+      .where(eq(point.id, pointId))
+      .limit(1);
+    return row ?? null;
+  }
+
+  async findRouteVersionId(
+    routeId: string,
+    version: string,
+  ): Promise<string | null> {
+    const [row] = await this.db
+      .select({ id: routeVersion.id })
+      .from(routeVersion)
+      .where(
+        and(
+          eq(routeVersion.routeId, routeId),
+          eq(routeVersion.version, version),
+        ),
+      )
+      .limit(1);
+    return row?.id ?? null;
+  }
+
+  async findRouteVersions(routeId: string) {
+    return this.db
+      .select()
+      .from(routeVersion)
+      .where(eq(routeVersion.routeId, routeId))
+      .orderBy(routeVersion.version);
+  }
+
+  async findStopVersionsWithPoints(routeVersionId: string) {
+    return this.db
+      .select({
+        stopVersion: stopVersion,
+        point: point,
+      })
+      .from(stopVersion)
+      .leftJoin(point, eq(stopVersion.pointId, point.id))
+      .where(eq(stopVersion.routeVersionId, routeVersionId))
+      .orderBy(stopVersion.order);
   }
 }
