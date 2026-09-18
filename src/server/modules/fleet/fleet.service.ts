@@ -2,6 +2,7 @@ import { ConflictError, NotFoundError } from "@/server/api";
 
 import type { FleetRepository } from "./fleet.repository";
 import type { CreateVehicleInput, UpdateVehicleInput } from "./fleet.types";
+import { createVehicleInputSchema, updateVehicleInputSchema } from "./fleet.types";
 
 export class FleetService {
   constructor(private readonly repository: FleetRepository) {}
@@ -19,7 +20,8 @@ export class FleetService {
   }
 
   async create(input: CreateVehicleInput) {
-    const plate = input.plate.toUpperCase();
+    const validated = createVehicleInputSchema.parse(input);
+    const plate = validated.plate.toUpperCase();
     const existing = await this.repository.findByPlate(plate);
     if (existing) {
       throw new ConflictError(
@@ -30,33 +32,34 @@ export class FleetService {
     return this.repository.create({
       id: crypto.randomUUID(),
       plate,
-      model: input.model,
-      kmPerLiterHundredths: Math.round(input.kmPerLiter * 100),
-      active: input.active ?? true,
+      model: validated.model,
+      kmPerLiterHundredths: Math.round(validated.kmPerLiter * 100),
+      active: validated.active ?? true,
     });
   }
 
   async update(input: UpdateVehicleInput) {
-    const plate = input.plate.toUpperCase();
-    const current = await this.repository.findById(input.id);
+    const validated = updateVehicleInputSchema.parse(input);
+    const plate = validated.plate.toUpperCase();
+    const current = await this.repository.findById(validated.id);
     if (!current) {
       throw new NotFoundError("Veículo não encontrado.");
     }
 
     if (plate !== current.plate.toUpperCase()) {
       const existing = await this.repository.findByPlate(plate);
-      if (existing && existing.id !== input.id) {
+      if (existing && existing.id !== validated.id) {
         throw new ConflictError(
           "Já existe outro veículo cadastrado com esta placa.",
         );
       }
     }
 
-    const updated = await this.repository.update(input.id, {
+    const updated = await this.repository.update(validated.id, {
       plate,
-      model: input.model,
-      kmPerLiterHundredths: Math.round(input.kmPerLiter * 100),
-      active: input.active,
+      model: validated.model,
+      kmPerLiterHundredths: Math.round(validated.kmPerLiter * 100),
+      active: validated.active,
     });
 
     if (!updated) {
