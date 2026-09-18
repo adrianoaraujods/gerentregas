@@ -48,18 +48,53 @@ export const routeVersionWithStopsSchema = routeVersionSchema.extend({
 });
 export type RouteVersionWithStops = z.infer<typeof routeVersionWithStopsSchema>;
 
-export const routeOutputSchema = routeSchema.pick({
-  id: true,
-  managerId: true,
-  driverId: true,
-  vehicleId: true,
-  date: true,
-  status: true,
-  currentVersion: true,
-  createdAt: true,
-  updatedAt: true,
+export const routePricingSchema = z.object({
+  distanceKm: z.number().nonnegative().nullable(),
+  cost: z.number().nonnegative().nullable(),
 });
+export type RoutePricing = z.infer<typeof routePricingSchema>;
+
+export const routeOutputSchema = routeSchema
+  .pick({
+    id: true,
+    managerId: true,
+    driverId: true,
+    vehicleId: true,
+    date: true,
+    status: true,
+    currentVersion: true,
+    createdAt: true,
+    updatedAt: true,
+  })
+  .extend(routePricingSchema.shape);
 export type RouteOutput = z.infer<typeof routeOutputSchema>;
+
+export const routeVersionOutputSchema = routeVersionSchema
+  .pick({
+    id: true,
+    routeId: true,
+    version: true,
+    managerId: true,
+    driverId: true,
+    vehicleId: true,
+    date: true,
+    status: true,
+    createdAt: true,
+  })
+  .extend(routePricingSchema.shape);
+export type RouteVersionOutput = z.infer<typeof routeVersionOutputSchema>;
+
+export const routeVersionWithStopsOutputSchema =
+  routeVersionOutputSchema.extend({
+    stops: z.array(
+      stopVersionSchema.extend({
+        point: pointOutputSchema.nullable(),
+      }),
+    ),
+  });
+export type RouteVersionWithStopsOutput = z.infer<
+  typeof routeVersionWithStopsOutputSchema
+>;
 
 export const stopOutputSchema = stopSchema.pick({
   id: true,
@@ -108,6 +143,10 @@ export const updateRouteInputSchema = z.object({
   driverId: z.string().uuid("ID do motorista inválido").optional(),
   vehicleId: z.string().uuid("ID do veículo inválido").optional().nullable(),
   status: routeStatusSchema.optional(),
+  distanceKm: z
+    .number()
+    .positive("Distância deve ser um valor positivo")
+    .optional(),
 });
 export type UpdateRouteInput = z.infer<typeof updateRouteInputSchema>;
 
@@ -155,7 +194,7 @@ export const driverRouteOutputSchema = routeWithStopsOutputSchema;
 export type DriverRouteOutput = z.infer<typeof driverRouteOutputSchema>;
 
 export const routeHistoryOutputSchema = z.object({
-  versions: z.array(routeVersionWithStopsSchema),
+  versions: z.array(routeVersionWithStopsOutputSchema),
 });
 export type RouteHistoryOutput = z.infer<typeof routeHistoryOutputSchema>;
 

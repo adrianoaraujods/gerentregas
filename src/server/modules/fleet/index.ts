@@ -1,4 +1,5 @@
 export { FleetController } from "./fleet.controller";
+export { FleetRepository } from "./fleet.repository";
 export { fleetRouter } from "./fleet.router";
 export type {
   CreateVehicleInput,

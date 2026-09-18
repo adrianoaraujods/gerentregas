@@ -1,4 +1,7 @@
 import type { Database } from "@/server/db";
+import { FleetRepository } from "@/server/modules/fleet";
+import { ParametersRepository } from "@/server/modules/parameters";
+import { createOsrmClient } from "./osrm";
 import { RoutesRepository } from "./routes.repository";
 import { RoutesService } from "./routes.service";
 import type {
@@ -34,7 +37,12 @@ export class RoutesController {
   private readonly service: RoutesService;
 
   constructor(readonly db: Database) {
-    this.service = new RoutesService(new RoutesRepository(db));
+    this.service = new RoutesService(
+      new RoutesRepository(db),
+      new ParametersRepository(db),
+      new FleetRepository(db),
+      createOsrmClient(),
+    );
   }
 
   async createRoute(

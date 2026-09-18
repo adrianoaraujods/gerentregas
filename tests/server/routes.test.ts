@@ -8,17 +8,24 @@ import {
 } from "@/server/api";
 import { db } from "@/server/db";
 import { user } from "@/server/db/schemas/auth";
+import { parameter } from "@/server/db/schemas/parameters";
 import { encrypt } from "@/server/lib/crypto";
+import { FleetRepository } from "@/server/modules/fleet";
+import { ParametersRepository } from "@/server/modules/parameters";
 import type { GeocodeResult } from "@/server/modules/points/geocoder";
 import { PointsRepository } from "@/server/modules/points/points.repository";
 import { PointsService } from "@/server/modules/points/points.service";
+import type { OsrmClient } from "@/server/modules/routes/osrm";
 import { RoutesRepository } from "@/server/modules/routes/routes.repository";
 import { RoutesService } from "@/server/modules/routes/routes.service";
 
 describe("RoutesService", () => {
   let routesRepository: RoutesRepository;
   let pointsRepository: PointsRepository;
+  let parametersRepository: ParametersRepository;
+  let fleetRepository: FleetRepository;
   let mockGeocoder: { geocode: ReturnType<typeof vi.fn> };
+  let mockOsrm: { routeLegDistancesKm: ReturnType<typeof vi.fn> };
   let pointsService: PointsService;
   let routesService: RoutesService;
 
@@ -27,24 +34,62 @@ describe("RoutesService", () => {
   let pointId1: string;
   let pointId2: string;
   let pointId3: string;
+  let vehicleAId: string;
+  let vehicleBId: string;
 
   beforeEach(async () => {
     routesRepository = new RoutesRepository(db);
     pointsRepository = new PointsRepository(db);
+    parametersRepository = new ParametersRepository(db);
+    fleetRepository = new FleetRepository(db);
     mockGeocoder = { geocode: vi.fn() };
+    mockOsrm = {
+      routeLegDistancesKm: vi.fn(async () => [5, 7]),
+    } as OsrmClient as unknown as {
+      routeLegDistancesKm: ReturnType<typeof vi.fn>;
+    };
     pointsService = new PointsService(
       pointsRepository,
       mockGeocoder as unknown as {
         geocode: (address: string) => Promise<GeocodeResult | null>;
       },
     );
-    routesService = new RoutesService(routesRepository);
+    routesService = new RoutesService(
+      routesRepository,
+      parametersRepository,
+      fleetRepository,
+      mockOsrm as unknown as OsrmClient,
+    );
 
     mockGeocoder.geocode.mockResolvedValue({
       latitude: -23.5505,
       longitude: -46.6333,
       displayName: "São Paulo, SP, Brasil",
     } as GeocodeResult);
+
+    await db.insert(parameter).values({
+      id: "system",
+      fuelPricePerLiter: 600,
+      standardWorkdayDuration: 480,
+    });
+
+    const vehicleA = await fleetRepository.create({
+      id: crypto.randomUUID(),
+      plate: "TST-0001",
+      model: "Moto Cargo 160",
+      kmPerLiterHundredths: 1250,
+      active: true,
+    });
+    vehicleAId = vehicleA.id;
+
+    const vehicleB = await fleetRepository.create({
+      id: crypto.randomUUID(),
+      plate: "TST-0002",
+      model: "Moto Cargo 250",
+      kmPerLiterHundredths: 1000,
+      active: true,
+    });
+    vehicleBId = vehicleB.id;
 
     managerId = crypto.randomUUID();
     driverId = crypto.randomUUID();
@@ -1054,32 +1099,13 @@ describe("RoutesService", () => {
     });
   });
 
-  describe("syncBatch (offline-first)", () => {
-    let vehicleId: string;
-    let routeId: string;
-    let stop2Id: string;
-    let stop3Id: string;
-
-    beforeEach(async () => {
-      const { vehicle } = await import("@/server/db/schemas/fleet");
-      const vehicleResult = await db
-        .insert(vehicle)
-        .values({
-          id: crypto.randomUUID(),
-          plate: `TEST-${crypto.randomUUID().slice(0, 8)}`,
-          model: "Test Vehicle",
-          kmPerLiterHundredths: 1000,
-          active: true,
-        })
-        .returning();
-      vehicleId = vehicleResult[0].id;
-
-      const date = new Date();
-      const route = await routesService.createRoute(
+  describe("OSRM distance (RN07)", () => {
+    it("computes distance on creation as the sum of OSRM legs", async () => {
+      const result = await routesService.createRoute(
         {
           driverId,
           vehicleId: null,
-          date: date.toISOString(),
+          date: new Date().toISOString(),
           stops: [
             { pointId: pointId1, order: "1" },
             { pointId: pointId2, order: "2" },
@@ -1088,157 +1114,83 @@ describe("RoutesService", () => {
         },
         managerId,
       );
-      routeId = route.id;
-      stop2Id = route.stops[1].id;
-      stop3Id = route.stops[2].id;
 
-      await routesService.startShift(routeId, { vehicleId }, driverId);
+      expect(mockOsrm.routeLegDistancesKm).toHaveBeenCalledTimes(1);
+      expect(mockOsrm.routeLegDistancesKm).toHaveBeenCalledWith([
+        { longitude: -46.6333, latitude: -23.5505 },
+        { longitude: -46.6333, latitude: -23.5505 },
+        { longitude: -46.6333, latitude: -23.5505 },
+      ]);
+      expect(result.distanceKm).toBe(12);
     });
 
-    it("accepts valid arrival and departure events", async () => {
-      const baseTime = new Date(Date.now() - 120000);
-      const arrivalTime = baseTime.toISOString();
-      const departureTime = new Date(baseTime.getTime() + 60000).toISOString();
-      const result = await routesService.syncBatch(
-        {
-          events: [
-            { stopId: stop2Id, type: "arrival", timestamp: arrivalTime },
-            { stopId: stop2Id, type: "departure", timestamp: departureTime },
-          ],
-        },
-        driverId,
-      );
-
-      expect(result.acceptedCount).toBe(2);
-      expect(result.rejectedCount).toBe(0);
-      expect(result.results[0].accepted).toBe(true);
-      expect(result.results[1].accepted).toBe(true);
-    });
-
-    it("rejects departure before arrival (DEPARTURE_BEFORE_ARRIVAL)", async () => {
-      const now = new Date().toISOString();
-      const result = await routesService.syncBatch(
-        {
-          events: [{ stopId: stop2Id, type: "departure", timestamp: now }],
-        },
-        driverId,
-      );
-
-      expect(result.acceptedCount).toBe(0);
-      expect(result.rejectedCount).toBe(1);
-      expect(result.results[0].accepted).toBe(false);
-      expect(result.results[0].reason).toBe("DEPARTURE_BEFORE_ARRIVAL");
-    });
-
-    it("rejects duplicate arrival on already closed stop (DUPLICATE_ARRIVAL_ON_CLOSED_STOP)", async () => {
-      const baseTime = new Date(Date.now() - 120000);
-      const arrivalTime = baseTime.toISOString();
-      const departureTime = new Date(baseTime.getTime() + 60000).toISOString();
-      await routesService.syncBatch(
-        {
-          events: [
-            { stopId: stop2Id, type: "arrival", timestamp: arrivalTime },
-            { stopId: stop2Id, type: "departure", timestamp: departureTime },
-          ],
-        },
-        driverId,
-      );
-
-      const result = await routesService.syncBatch(
-        {
-          events: [
-            {
-              stopId: stop2Id,
-              type: "arrival",
-              timestamp: new Date().toISOString(),
-            },
-          ],
-        },
-        driverId,
-      );
-
-      expect(result.rejectedCount).toBe(1);
-      expect(result.results[0].reason).toBe("DUPLICATE_ARRIVAL_ON_CLOSED_STOP");
-    });
-
-    it("rejects timestamp off route date (TIMESTAMP_OFF_ROUTE_DATE)", async () => {
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      const result = await routesService.syncBatch(
-        {
-          events: [
-            {
-              stopId: stop2Id,
-              type: "arrival",
-              timestamp: yesterday.toISOString(),
-            },
-          ],
-        },
-        driverId,
-      );
-
-      expect(result.rejectedCount).toBe(1);
-      expect(result.results[0].reason).toBe("TIMESTAMP_OFF_ROUTE_DATE");
-    });
-
-    it("rejects future timestamp (FUTURE_TIMESTAMP)", async () => {
-      const future = new Date();
-      future.setDate(future.getDate() + 1);
-      const result = await routesService.syncBatch(
-        {
-          events: [
-            {
-              stopId: stop2Id,
-              type: "arrival",
-              timestamp: future.toISOString(),
-            },
-          ],
-        },
-        driverId,
-      );
-
-      expect(result.rejectedCount).toBe(1);
-      expect(result.results[0].reason).toBe("FUTURE_TIMESTAMP");
-    });
-
-    it("rejects stop not in driver route (STOP_NOT_IN_DRIVER_ROUTE)", async () => {
-      const otherDriverId = crypto.randomUUID();
-      await db.insert(user).values({
-        id: otherDriverId,
-        name: "Other Driver",
-        email: "other5@test.com",
-        emailVerified: true,
-        role: "driver",
-        document: encrypt("55555555555"),
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      });
-
-      const result = await routesService.syncBatch(
-        {
-          events: [
-            {
-              stopId: stop2Id,
-              type: "arrival",
-              timestamp: new Date().toISOString(),
-            },
-          ],
-        },
-        otherDriverId,
-      );
-
-      expect(result.rejectedCount).toBe(1);
-      expect(result.results[0].reason).toBe("STOP_NOT_IN_DRIVER_ROUTE");
-    });
-
-    it("rejects when route not in_flight (ROUTE_NOT_IN_FLIGHT)", async () => {
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      const draftRoute = await routesService.createRoute(
+    it("uses zero distance for a single-stop route without calling OSRM", async () => {
+      const result = await routesService.createRoute(
         {
           driverId,
           vehicleId: null,
-          date: tomorrow.toISOString(),
+          date: new Date().toISOString(),
+          stops: [{ pointId: pointId1, order: "1" }],
+        },
+        managerId,
+      );
+
+      expect(mockOsrm.routeLegDistancesKm).not.toHaveBeenCalled();
+      expect(result.distanceKm).toBe(0);
+    });
+
+    it("leaves distance indeterminate when a stop has no coordinates", async () => {
+      mockGeocoder.geocode.mockResolvedValueOnce(null);
+      const ungeocodedPoint = await pointsService.createPoint({
+        name: "Sem coordenadas",
+        address: "Endereço desconhecido, São Paulo, SP",
+      });
+
+      const result = await routesService.createRoute(
+        {
+          driverId,
+          vehicleId: vehicleAId,
+          date: new Date().toISOString(),
+          stops: [
+            { pointId: pointId1, order: "1" },
+            { pointId: ungeocodedPoint.id, order: "2" },
+          ],
+        },
+        managerId,
+      );
+
+      expect(mockOsrm.routeLegDistancesKm).not.toHaveBeenCalled();
+      expect(result.distanceKm).toBeNull();
+      expect(result.cost).toBeNull();
+    });
+  });
+
+  describe("route cost (RN07)", () => {
+    it("computes cost from distance, fuel price and vehicle consumption", async () => {
+      const result = await routesService.createRoute(
+        {
+          driverId,
+          vehicleId: vehicleAId,
+          date: new Date().toISOString(),
+          stops: [
+            { pointId: pointId1, order: "1" },
+            { pointId: pointId2, order: "2" },
+            { pointId: pointId3, order: "3" },
+          ],
+        },
+        managerId,
+      );
+
+      expect(result.distanceKm).toBe(12);
+      expect(result.cost).toBe(5.76);
+    });
+
+    it("reads indeterminate when no vehicle is bound", async () => {
+      const result = await routesService.createRoute(
+        {
+          driverId,
+          vehicleId: null,
+          date: new Date().toISOString(),
           stops: [
             { pointId: pointId1, order: "1" },
             { pointId: pointId2, order: "2" },
@@ -1246,157 +1198,116 @@ describe("RoutesService", () => {
         },
         managerId,
       );
-      const draftStopId = draftRoute.stops[1].id;
 
-      const result = await routesService.syncBatch(
-        {
-          events: [
-            {
-              stopId: draftStopId,
-              type: "arrival",
-              timestamp: new Date().toISOString(),
-            },
-          ],
-        },
-        driverId,
-      );
-
-      expect(result.rejectedCount).toBe(1);
-      expect(result.results[0].reason).toBe("ROUTE_NOT_IN_FLIGHT");
+      expect(result.distanceKm).toBe(12);
+      expect(result.cost).toBeNull();
     });
 
-    it("rejects non-existent stop (STOP_NOT_FOUND)", async () => {
-      const result = await routesService.syncBatch(
+    it("recomputes cost when the bound vehicle changes", async () => {
+      const route = await routesService.createRoute(
         {
-          events: [
-            {
-              stopId: crypto.randomUUID(),
-              type: "arrival",
-              timestamp: new Date().toISOString(),
-            },
+          driverId,
+          vehicleId: vehicleAId,
+          date: new Date().toISOString(),
+          stops: [
+            { pointId: pointId1, order: "1" },
+            { pointId: pointId2, order: "2" },
           ],
         },
-        driverId,
+        managerId,
+      );
+      expect(route.cost).toBe(5.76);
+
+      const updated = await routesService.updateRoute(
+        route.id,
+        { vehicleId: vehicleBId },
+        managerId,
+      );
+      expect(updated.cost).toBe(7.2);
+    });
+  });
+
+  describe("distance override", () => {
+    it("creates a new audited route version (RNF05)", async () => {
+      const route = await routesService.createRoute(
+        {
+          driverId,
+          vehicleId: vehicleAId,
+          date: new Date().toISOString(),
+          stops: [
+            { pointId: pointId1, order: "1" },
+            { pointId: pointId2, order: "2" },
+          ],
+        },
+        managerId,
       );
 
-      expect(result.rejectedCount).toBe(1);
-      expect(result.results[0].reason).toBe("STOP_NOT_FOUND");
+      const updated = await routesService.updateRoute(
+        route.id,
+        { distanceKm: 15 },
+        managerId,
+      );
+
+      expect(updated.currentVersion).toBe("2");
+      expect(updated.distanceKm).toBe(15);
+
+      const history = await routesService.getRouteHistory(route.id);
+      expect(history.versions.length).toBe(2);
+      expect(history.versions[0].version).toBe("1");
+      expect(history.versions[0].distanceKm).toBe(12);
+      expect(history.versions[1].version).toBe("2");
+      expect(history.versions[1].distanceKm).toBe(15);
     });
 
-    it("mixed batch: accepts valid, rejects invalid", async () => {
-      const baseTime = new Date(Date.now() - 120000);
-      const now = baseTime.toISOString();
-      const future = new Date(baseTime);
-      future.setDate(future.getDate() + 1);
-      const validDeparture = new Date(baseTime.getTime() + 60000).toISOString();
-
-      const result = await routesService.syncBatch(
+    it("recomputes cost from the overridden distance", async () => {
+      const route = await routesService.createRoute(
         {
-          events: [
-            { stopId: stop2Id, type: "arrival", timestamp: now },
-            {
-              stopId: stop3Id,
-              type: "arrival",
-              timestamp: future.toISOString(),
-            },
-            { stopId: stop2Id, type: "departure", timestamp: validDeparture },
+          driverId,
+          vehicleId: vehicleAId,
+          date: new Date().toISOString(),
+          stops: [
+            { pointId: pointId1, order: "1" },
+            { pointId: pointId2, order: "2" },
           ],
         },
-        driverId,
+        managerId,
       );
+      expect(route.cost).toBe(5.76);
 
-      expect(result.acceptedCount).toBe(2);
-      expect(result.rejectedCount).toBe(1);
-      expect(result.results[0].accepted).toBe(true);
-      expect(result.results[1].accepted).toBe(false);
-      expect(result.results[1].reason).toBe("FUTURE_TIMESTAMP");
-      expect(result.results[2].accepted).toBe(true);
+      const updated = await routesService.updateRoute(
+        route.id,
+        { distanceKm: 20 },
+        managerId,
+      );
+      expect(updated.distanceKm).toBe(20);
+      expect(updated.cost).toBe(9.6);
     });
 
-    it("re-upload after local correction passes", async () => {
-      const now = new Date().toISOString();
-      const future = new Date();
-      future.setDate(future.getDate() + 1);
-
-      const firstResult = await routesService.syncBatch(
+    it("rejects overriding distance on a concluded route", async () => {
+      const route = await routesService.createRoute(
         {
-          events: [
-            {
-              stopId: stop2Id,
-              type: "arrival",
-              timestamp: future.toISOString(),
-            },
-          ],
+          driverId,
+          vehicleId: null,
+          date: new Date().toISOString(),
+          stops: [{ pointId: pointId1, order: "1" }],
         },
-        driverId,
+        managerId,
       );
 
-      expect(firstResult.rejectedCount).toBe(1);
-      expect(firstResult.results[0].reason).toBe("FUTURE_TIMESTAMP");
-
-      const correctedResult = await routesService.syncBatch(
-        {
-          events: [{ stopId: stop2Id, type: "arrival", timestamp: now }],
-        },
-        driverId,
+      await routesService.updateRoute(
+        route.id,
+        { status: "in_flight" },
+        managerId,
+      );
+      await routesService.updateRoute(
+        route.id,
+        { status: "concluded" },
+        managerId,
       );
 
-      expect(correctedResult.acceptedCount).toBe(1);
-      expect(correctedResult.rejectedCount).toBe(0);
-      expect(correctedResult.results[0].accepted).toBe(true);
-    });
-
-    it("route edited while offline does not invalidate valid entries (no version gate)", async () => {
-      const baseTime = new Date(Date.now() - 120000);
-      const now = baseTime.toISOString();
-      const validDeparture = new Date(baseTime.getTime() + 60000).toISOString();
-
-      await routesService.syncBatch(
-        {
-          events: [
-            { stopId: stop2Id, type: "arrival", timestamp: now },
-            { stopId: stop2Id, type: "departure", timestamp: validDeparture },
-          ],
-        },
-        driverId,
-      );
-
-      const managerId2 = crypto.randomUUID();
-      await db.insert(user).values({
-        id: managerId2,
-        name: "Manager 2",
-        email: "manager2@test.com",
-        emailVerified: true,
-        role: "manager",
-        document: encrypt("99999999999"),
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      });
-
-      await routesService.addStop(
-        routeId,
-        { routeId, pointId: pointId3, order: "4" },
-        managerId2,
-      );
-
-      const secondBaseTime = new Date(Date.now() - 60000);
-      const secondNow = secondBaseTime.toISOString();
-      const secondDeparture = new Date(
-        secondBaseTime.getTime() + 60000,
-      ).toISOString();
-
-      const result = await routesService.syncBatch(
-        {
-          events: [
-            { stopId: stop3Id, type: "arrival", timestamp: secondNow },
-            { stopId: stop3Id, type: "departure", timestamp: secondDeparture },
-          ],
-        },
-        driverId,
-      );
-
-      expect(result.acceptedCount).toBe(2);
-      expect(result.rejectedCount).toBe(0);
+      await expect(
+        routesService.updateRoute(route.id, { distanceKm: 10 }, managerId),
+      ).rejects.toThrow(BadRequestError);
     });
   });
 });

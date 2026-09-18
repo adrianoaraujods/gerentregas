@@ -1,5 +1,6 @@
 import {
   index,
+  integer,
   pgEnum,
   pgTable,
   real,
@@ -34,6 +35,7 @@ export const route = pgTable(
     date: timestamp("date").notNull(),
     status: routeStatusEnum("status").notNull().default("draft"),
     currentVersion: text("current_version").notNull().default("1"),
+    distanceKmHundredths: integer("distance_km_hundredths"),
     deletedAt: timestamp("deleted_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
@@ -69,6 +71,7 @@ export const routeVersion = pgTable(
     vehicleId: text("vehicle_id").references(() => vehicle.id),
     date: timestamp("date").notNull(),
     status: routeStatusEnum("status").notNull(),
+    distanceKmHundredths: integer("distance_km_hundredths"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [
