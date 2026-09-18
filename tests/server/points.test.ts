@@ -2,13 +2,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { BadRequestError, NotFoundError } from "@/server/api";
 import { db } from "@/server/db";
-import type { GeocodeResult, Geocoder } from "@/server/modules/points/geocoder";
+import type { GeocodeResult } from "@/server/modules/points/geocoder";
 import { PointsRepository } from "@/server/modules/points/points.repository";
 import { PointsService } from "@/server/modules/points/points.service";
 
 describe("PointsService", () => {
   let repository: PointsRepository;
-  let mockGeocoder: Geocoder;
+  let mockGeocoder: { geocode: ReturnType<typeof vi.fn> };
   let service: PointsService;
 
   beforeEach(() => {
@@ -16,7 +16,12 @@ describe("PointsService", () => {
     mockGeocoder = {
       geocode: vi.fn(),
     };
-    service = new PointsService(repository, mockGeocoder);
+    service = new PointsService(
+      repository,
+      mockGeocoder as unknown as {
+        geocode: (address: string) => Promise<GeocodeResult | null>;
+      },
+    );
   });
 
   describe("createPoint", () => {

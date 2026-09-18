@@ -4,6 +4,7 @@ import { authRouter } from "@/server/modules/auth";
 import { driversRouter } from "@/server/modules/drivers";
 import { parametersRouter } from "@/server/modules/parameters";
 import { pointsRouter } from "@/server/modules/points";
+import { routesRouter } from "@/server/modules/routes";
 
 import { createCallerFactory, createRouter } from "./trpc";
 
@@ -17,6 +18,7 @@ export const appRouter = createRouter({
   drivers: driversRouter,
   parameters: parametersRouter,
   points: pointsRouter,
+  routes: routesRouter,
 });
 
 /**
