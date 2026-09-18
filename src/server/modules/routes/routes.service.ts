@@ -1,24 +1,52 @@
 import { BadRequestError, ConflictError, NotFoundError } from "@/server/api";
+import type { FleetRepository } from "@/server/modules/fleet";
+import type { ParametersRepository } from "@/server/modules/parameters";
 
+import {
+  costCentsToBRL,
+  hundredthsToKm,
+  routeCostCents,
+  toKmHundredths,
+} from "./cost";
+import { createOsrmClient, type OsrmClient } from "./osrm";
 import type { RoutesRepository } from "./routes.repository";
 import type {
   AddStopInput,
   CreateRouteInput,
+  DriverRouteOutput,
   Route,
+  RouteHistoryOutput,
   RouteStatus,
-  RouteWithStops,
+  RoutesListOutput,
+  RouteVersionWithStops,
+  RouteWithStopsOutput,
   Stop,
   UpdateRouteInput,
   UpdateStopInput,
 } from "./routes.types";
 
+type CoordinateLike = {
+  longitude: number | null;
+  latitude: number | null;
+};
+
+type CoordinatePriced = {
+  distanceKmHundredths: number | null;
+  vehicleId: string | null;
+};
+
 export class RoutesService {
-  constructor(private readonly repository: RoutesRepository) {}
+  constructor(
+    private readonly repository: RoutesRepository,
+    private readonly parametersRepository: ParametersRepository,
+    private readonly fleetRepository: FleetRepository,
+    private readonly osrm: OsrmClient = createOsrmClient(),
+  ) {}
 
   async createRoute(
     input: CreateRouteInput,
     managerId: string,
-  ): Promise<RouteWithStops> {
+  ): Promise<RouteWithStopsOutput> {
     const existingRoute = await this.repository.checkDriverDateConflict(
       input.driverId,
       new Date(input.date),
@@ -53,6 +81,17 @@ export class RoutesService {
       }
     }
 
+    const coordinates = stops.map((s) => {
+      const pointData = pointsMap.get(s.pointId);
+      return pointData
+        ? {
+            longitude: pointData.longitude,
+            latitude: pointData.latitude,
+          }
+        : { longitude: null, latitude: null };
+    });
+    const distanceKmHundredths = await this.computeRouteDistance(coordinates);
+
     const newRoute = await this.repository.createRoute({
       managerId,
       driverId: input.driverId,
@@ -60,6 +99,7 @@ export class RoutesService {
       date: new Date(input.date),
       status: "draft",
       currentVersion: "1",
+      distanceKmHundredths,
     });
 
     if (!newRoute) {
@@ -89,6 +129,7 @@ export class RoutesService {
       vehicleId: input.vehicleId ?? null,
       date: new Date(input.date),
       status: "draft",
+      distanceKmHundredths,
     });
 
     const routeVersionId = await this.repository.findRouteVersionId(
@@ -116,27 +157,29 @@ export class RoutesService {
     if (!result) {
       throw new BadRequestError("Falha ao buscar rota criada.");
     }
-    return result;
+    return this.addPricing(result);
   }
 
-  async getRoute(routeId: string): Promise<RouteWithStops> {
+  async getRoute(routeId: string): Promise<RouteWithStopsOutput> {
     const routeData = await this.repository.findRouteWithStops(routeId);
     if (!routeData) {
       throw new NotFoundError("Rota não encontrada.");
     }
-    return routeData;
+    return this.addPricing(routeData);
   }
 
   async getDriverRoute(
     driverId: string,
     date: Date,
-  ): Promise<RouteWithStops | null> {
+  ): Promise<DriverRouteOutput | null> {
     const routeData = await this.repository.findRouteByDriverAndDate(
       driverId,
       date,
     );
     if (!routeData) return null;
-    return this.repository.findRouteWithStops(routeData.id);
+    const result = await this.repository.findRouteWithStops(routeData.id);
+    if (!result) return null;
+    return this.addPricing(result);
   }
 
   async listRoutes(input: {
@@ -146,15 +189,35 @@ export class RoutesService {
     status?: RouteStatus;
     dateFrom?: Date;
     dateTo?: Date;
-  }) {
-    return this.repository.listRoutes(input);
+  }): Promise<RoutesListOutput> {
+    const { routes, total } = await this.repository.listRoutes(input);
+    const fuelPricePerLiter = await this.getFuelPricePerLiter();
+
+    const routesWithPricing = await Promise.all(
+      routes.map(async (routeRow) => {
+        const kmPerLiterHundredths =
+          await this.getKmPerLiterHundredths(routeRow);
+        const costCents = routeCostCents({
+          distanceHundredths: routeRow.distanceKmHundredths,
+          fuelPricePerLiter,
+          kmPerLiterHundredths,
+        });
+        return {
+          ...routeRow,
+          distanceKm: hundredthsToKm(routeRow.distanceKmHundredths),
+          cost: costCentsToBRL(costCents),
+        };
+      }),
+    );
+
+    return { routes: routesWithPricing, total };
   }
 
   async updateRoute(
     routeId: string,
     input: UpdateRouteInput,
     managerId: string,
-  ): Promise<RouteWithStops> {
+  ): Promise<RouteWithStopsOutput> {
     const existingRoute = await this.repository.findRouteById(routeId);
     if (!existingRoute) {
       throw new NotFoundError("Rota não encontrada.");
@@ -181,19 +244,36 @@ export class RoutesService {
       existingRoute.status !== "draft" &&
       existingRoute.status !== "in_flight"
     ) {
-      if (input.driverId || input.vehicleId !== undefined) {
+      if (
+        input.driverId ||
+        input.vehicleId !== undefined ||
+        input.distanceKm !== undefined
+      ) {
         throw new BadRequestError(
-          "Não é possível alterar motorista ou veículo de rota concluída ou cancelada.",
+          "Não é possível alterar motorista, veículo ou distância de rota concluída ou cancelada.",
         );
       }
     }
 
-    const updatedRoute = await this.repository.updateRoute(routeId, input);
+    const updatedRoute = await this.repository.updateRoute(routeId, {
+      driverId: input.driverId,
+      vehicleId: input.vehicleId,
+      status: input.status,
+      distanceKmHundredths:
+        input.distanceKm !== undefined
+          ? toKmHundredths(input.distanceKm)
+          : undefined,
+    });
     if (!updatedRoute) {
       throw new NotFoundError("Rota não encontrada.");
     }
 
-    if (input.driverId || input.vehicleId !== undefined || input.status) {
+    if (
+      input.driverId ||
+      input.vehicleId !== undefined ||
+      input.status ||
+      input.distanceKm !== undefined
+    ) {
       await this.createNewVersion(routeId, managerId, updatedRoute);
     }
 
@@ -201,14 +281,14 @@ export class RoutesService {
     if (!result) {
       throw new BadRequestError("Falha ao buscar rota atualizada.");
     }
-    return result;
+    return this.addPricing(result);
   }
 
   async addStop(
     routeId: string,
     input: AddStopInput,
     managerId: string,
-  ): Promise<RouteWithStops> {
+  ): Promise<RouteWithStopsOutput> {
     const existingRoute = await this.repository.findRouteWithStops(routeId);
     if (!existingRoute) {
       throw new NotFoundError("Rota não encontrada.");
@@ -266,13 +346,18 @@ export class RoutesService {
       throw new BadRequestError("Falha ao criar parada.");
     }
 
-    await this.createNewVersion(routeId, managerId, existingRoute);
+    await this.recomputeRouteDistance(routeId);
+    const updatedRoute = await this.repository.findRouteById(routeId);
+    if (!updatedRoute) {
+      throw new BadRequestError("Falha ao buscar rota atualizada.");
+    }
+    await this.createNewVersion(routeId, managerId, updatedRoute);
 
     const result = await this.repository.findRouteWithStops(routeId);
     if (!result) {
       throw new BadRequestError("Falha ao buscar rota atualizada.");
     }
-    return result;
+    return this.addPricing(result);
   }
 
   async updateStop(
@@ -280,7 +365,7 @@ export class RoutesService {
     stopId: string,
     input: UpdateStopInput,
     managerId: string,
-  ): Promise<RouteWithStops> {
+  ): Promise<RouteWithStopsOutput> {
     const existingRoute = await this.repository.findRouteWithStops(routeId);
     if (!existingRoute) {
       throw new NotFoundError("Rota não encontrada.");
@@ -345,16 +430,24 @@ export class RoutesService {
     }
 
     await this.repository.updateStop(stopId, input);
-    await this.createNewVersion(routeId, managerId, existingRoute);
+    await this.recomputeRouteDistance(routeId);
+    const updatedRoute = await this.repository.findRouteById(routeId);
+    if (!updatedRoute) {
+      throw new BadRequestError("Falha ao buscar rota atualizada.");
+    }
+    await this.createNewVersion(routeId, managerId, updatedRoute);
 
     const result = await this.repository.findRouteWithStops(routeId);
     if (!result) {
       throw new BadRequestError("Falha ao buscar rota atualizada.");
     }
-    return result;
+    return this.addPricing(result);
   }
 
-  async concludeStop(routeId: string, stopId: string): Promise<RouteWithStops> {
+  async concludeStop(
+    routeId: string,
+    stopId: string,
+  ): Promise<RouteWithStopsOutput> {
     const existingRoute = await this.repository.findRouteWithStops(routeId);
     if (!existingRoute) {
       throw new NotFoundError("Rota não encontrada.");
@@ -385,14 +478,14 @@ export class RoutesService {
     if (!result) {
       throw new BadRequestError("Falha ao buscar rota atualizada.");
     }
-    return result;
+    return this.addPricing(result);
   }
 
   async deleteStop(
     routeId: string,
     stopId: string,
     managerId: string,
-  ): Promise<RouteWithStops> {
+  ): Promise<RouteWithStopsOutput> {
     const existingRoute = await this.repository.findRouteWithStops(routeId);
     if (!existingRoute) {
       throw new NotFoundError("Rota não encontrada.");
@@ -436,13 +529,18 @@ export class RoutesService {
     }
 
     await this.repository.softDeleteStop(stopId);
-    await this.createNewVersion(routeId, managerId, existingRoute);
+    await this.recomputeRouteDistance(routeId);
+    const updatedRoute = await this.repository.findRouteById(routeId);
+    if (!updatedRoute) {
+      throw new BadRequestError("Falha ao buscar rota atualizada.");
+    }
+    await this.createNewVersion(routeId, managerId, updatedRoute);
 
     const result = await this.repository.findRouteWithStops(routeId);
     if (!result) {
       throw new BadRequestError("Falha ao buscar rota atualizada.");
     }
-    return result;
+    return this.addPricing(result);
   }
 
   async softDeleteRoute(routeId: string): Promise<void> {
@@ -454,7 +552,7 @@ export class RoutesService {
     await this.repository.softDeleteRoute(routeId);
   }
 
-  async restoreRoute(routeId: string): Promise<RouteWithStops> {
+  async restoreRoute(routeId: string): Promise<RouteWithStopsOutput> {
     const existingRoute = await this.repository.findRouteById(routeId, true);
     if (!existingRoute) {
       throw new NotFoundError("Rota não encontrada.");
@@ -472,18 +570,29 @@ export class RoutesService {
     if (!result) {
       throw new BadRequestError("Falha ao buscar rota restaurada.");
     }
-    return result;
+    return this.addPricing(result);
   }
 
-  async getRouteHistory(routeId: string) {
+  async getRouteHistory(routeId: string): Promise<RouteHistoryOutput> {
     const versions = await this.repository.findRouteVersions(routeId);
+    const fuelPricePerLiter = await this.getFuelPricePerLiter();
 
     const versionsWithStops = await Promise.all(
       versions.map(async (v) => {
         const stops = await this.repository.findStopVersionsWithPoints(v.id);
-
-        return {
+        const kmPerLiterHundredths = await this.getKmPerLiterHundredths(v);
+        const costCents = routeCostCents({
+          distanceHundredths: v.distanceKmHundredths,
+          fuelPricePerLiter,
+          kmPerLiterHundredths,
+        });
+        const routeVersionWithStops: RouteVersionWithStops & {
+          distanceKm: number | null;
+          cost: number | null;
+        } = {
           ...v,
+          distanceKm: hundredthsToKm(v.distanceKmHundredths),
+          cost: costCentsToBRL(costCents),
           stops: stops.map(({ stopVersion: sv, point: p }) => ({
             ...sv,
             point: p
@@ -500,6 +609,7 @@ export class RoutesService {
               : null,
           })),
         };
+        return routeVersionWithStops;
       }),
     );
 
@@ -524,6 +634,71 @@ export class RoutesService {
     }
   }
 
+  private async recomputeRouteDistance(routeId: string): Promise<void> {
+    const stops = await this.repository.listStopsByRoute(routeId);
+    const coordinates: CoordinateLike[] = stops.map((s) => ({
+      longitude: s.longitudeSnapshot,
+      latitude: s.latitudeSnapshot,
+    }));
+    const distanceKmHundredths = await this.computeRouteDistance(coordinates);
+    await this.repository.updateRoute(routeId, { distanceKmHundredths });
+  }
+
+  private async computeRouteDistance(
+    coordinates: CoordinateLike[],
+  ): Promise<number | null> {
+    if (coordinates.length < 2) {
+      return 0;
+    }
+    if (coordinates.some((c) => c.longitude === null || c.latitude === null)) {
+      return null;
+    }
+    try {
+      const legs = await this.osrm.routeLegDistancesKm(
+        coordinates as Array<{ longitude: number; latitude: number }>,
+      );
+      const totalKm = legs.reduce((sum, leg) => sum + leg, 0);
+      return toKmHundredths(totalKm);
+    } catch {
+      return null;
+    }
+  }
+
+  private async getFuelPricePerLiter(): Promise<number | null> {
+    const parameters = await this.parametersRepository.find();
+    return parameters?.fuelPricePerLiter ?? null;
+  }
+
+  private async getKmPerLiterHundredths(routeRow: {
+    vehicleId: string | null;
+  }): Promise<number | null> {
+    if (!routeRow.vehicleId) return null;
+    const vehicleRow = await this.fleetRepository.findById(routeRow.vehicleId);
+    return vehicleRow?.kmPerLiterHundredths ?? null;
+  }
+
+  private async addPricing<T extends CoordinatePriced>(
+    row: T,
+  ): Promise<
+    T & {
+      distanceKm: number | null;
+      cost: number | null;
+    }
+  > {
+    const fuelPricePerLiter = await this.getFuelPricePerLiter();
+    const kmPerLiterHundredths = await this.getKmPerLiterHundredths(row);
+    const costCents = routeCostCents({
+      distanceHundredths: row.distanceKmHundredths,
+      fuelPricePerLiter,
+      kmPerLiterHundredths,
+    });
+    return {
+      ...row,
+      distanceKm: hundredthsToKm(row.distanceKmHundredths),
+      cost: costCentsToBRL(costCents),
+    };
+  }
+
   private async createNewVersion(
     routeId: string,
     managerId: string,
@@ -542,6 +717,7 @@ export class RoutesService {
       vehicleId: currentRoute.vehicleId,
       date: currentRoute.date,
       status: currentRoute.status,
+      distanceKmHundredths: currentRoute.distanceKmHundredths,
     });
 
     if (!newRouteVersion) {

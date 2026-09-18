@@ -1,3 +1,5 @@
+export * from "./cost";
+export * from "./osrm";
 export { RoutesController } from "./routes.controller";
 export { RoutesRepository } from "./routes.repository";
 export { routesRouter } from "./routes.router";

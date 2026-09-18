@@ -2,7 +2,10 @@ import { ConflictError, NotFoundError } from "@/server/api";
 
 import type { FleetRepository } from "./fleet.repository";
 import type { CreateVehicleInput, UpdateVehicleInput } from "./fleet.types";
-import { createVehicleInputSchema, updateVehicleInputSchema } from "./fleet.types";
+import {
+  createVehicleInputSchema,
+  updateVehicleInputSchema,
+} from "./fleet.types";
 
 export class FleetService {
   constructor(private readonly repository: FleetRepository) {}

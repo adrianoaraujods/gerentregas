@@ -26,6 +26,7 @@ export class RoutesRepository {
     date: Date;
     status: Route["status"];
     currentVersion: string;
+    distanceKmHundredths: number | null;
   }): Promise<Route | null> {
     const [row] = await this.db
       .insert(route)
@@ -45,6 +46,7 @@ export class RoutesRepository {
     vehicleId: string | null;
     date: Date;
     status: RouteVersion["status"];
+    distanceKmHundredths: number | null;
   }): Promise<RouteVersion | null> {
     const [row] = await this.db
       .insert(routeVersion)
@@ -281,7 +283,14 @@ export class RoutesRepository {
   async updateRoute(
     id: string,
     input: Partial<
-      Pick<Route, "driverId" | "vehicleId" | "status" | "currentVersion">
+      Pick<
+        Route,
+        | "driverId"
+        | "vehicleId"
+        | "status"
+        | "currentVersion"
+        | "distanceKmHundredths"
+      >
     >,
   ): Promise<Route | null> {
     const updates: Record<string, unknown> = {};
@@ -290,6 +299,8 @@ export class RoutesRepository {
     if (input.status !== undefined) updates.status = input.status;
     if (input.currentVersion !== undefined)
       updates.currentVersion = input.currentVersion;
+    if (input.distanceKmHundredths !== undefined)
+      updates.distanceKmHundredths = input.distanceKmHundredths;
     if (Object.keys(updates).length === 0) return null;
 
     updates.updatedAt = new Date();

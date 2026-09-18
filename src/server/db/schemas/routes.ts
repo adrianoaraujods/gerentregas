@@ -1,5 +1,6 @@
 import {
   index,
+  integer,
   pgEnum,
   pgTable,
   real,
@@ -8,6 +9,7 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { user } from "./auth";
+import { vehicle } from "./fleet";
 import { point } from "./points";
 
 export const routeStatusEnum = pgEnum("route_status", [
@@ -29,10 +31,11 @@ export const route = pgTable(
     driverId: text("driver_id")
       .notNull()
       .references(() => user.id),
-    vehicleId: text("vehicle_id").references(() => user.id),
+    vehicleId: text("vehicle_id").references(() => vehicle.id),
     date: timestamp("date").notNull(),
     status: routeStatusEnum("status").notNull().default("draft"),
     currentVersion: text("current_version").notNull().default("1"),
+    distanceKmHundredths: integer("distance_km_hundredths"),
     deletedAt: timestamp("deleted_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
@@ -65,9 +68,10 @@ export const routeVersion = pgTable(
     driverId: text("driver_id")
       .notNull()
       .references(() => user.id),
-    vehicleId: text("vehicle_id").references(() => user.id),
+    vehicleId: text("vehicle_id").references(() => vehicle.id),
     date: timestamp("date").notNull(),
     status: routeStatusEnum("status").notNull(),
+    distanceKmHundredths: integer("distance_km_hundredths"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [

@@ -3,17 +3,24 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { BadRequestError, ConflictError, NotFoundError } from "@/server/api";
 import { db } from "@/server/db";
 import { user } from "@/server/db/schemas/auth";
+import { parameter } from "@/server/db/schemas/parameters";
 import { encrypt } from "@/server/lib/crypto";
+import { FleetRepository } from "@/server/modules/fleet";
+import { ParametersRepository } from "@/server/modules/parameters";
 import type { GeocodeResult } from "@/server/modules/points/geocoder";
 import { PointsRepository } from "@/server/modules/points/points.repository";
 import { PointsService } from "@/server/modules/points/points.service";
+import type { OsrmClient } from "@/server/modules/routes/osrm";
 import { RoutesRepository } from "@/server/modules/routes/routes.repository";
 import { RoutesService } from "@/server/modules/routes/routes.service";
 
 describe("RoutesService", () => {
   let routesRepository: RoutesRepository;
   let pointsRepository: PointsRepository;
+  let parametersRepository: ParametersRepository;
+  let fleetRepository: FleetRepository;
   let mockGeocoder: { geocode: ReturnType<typeof vi.fn> };
+  let mockOsrm: { routeLegDistancesKm: ReturnType<typeof vi.fn> };
   let pointsService: PointsService;
   let routesService: RoutesService;
 
@@ -22,24 +29,62 @@ describe("RoutesService", () => {
   let pointId1: string;
   let pointId2: string;
   let pointId3: string;
+  let vehicleAId: string;
+  let vehicleBId: string;
 
   beforeEach(async () => {
     routesRepository = new RoutesRepository(db);
     pointsRepository = new PointsRepository(db);
+    parametersRepository = new ParametersRepository(db);
+    fleetRepository = new FleetRepository(db);
     mockGeocoder = { geocode: vi.fn() };
+    mockOsrm = {
+      routeLegDistancesKm: vi.fn(async () => [5, 7]),
+    } as OsrmClient as unknown as {
+      routeLegDistancesKm: ReturnType<typeof vi.fn>;
+    };
     pointsService = new PointsService(
       pointsRepository,
       mockGeocoder as unknown as {
         geocode: (address: string) => Promise<GeocodeResult | null>;
       },
     );
-    routesService = new RoutesService(routesRepository);
+    routesService = new RoutesService(
+      routesRepository,
+      parametersRepository,
+      fleetRepository,
+      mockOsrm as unknown as OsrmClient,
+    );
 
     mockGeocoder.geocode.mockResolvedValue({
       latitude: -23.5505,
       longitude: -46.6333,
       displayName: "São Paulo, SP, Brasil",
     } as GeocodeResult);
+
+    await db.insert(parameter).values({
+      id: "system",
+      fuelPricePerLiter: 600,
+      standardWorkdayDuration: 480,
+    });
+
+    const vehicleA = await fleetRepository.create({
+      id: crypto.randomUUID(),
+      plate: "TST-0001",
+      model: "Moto Cargo 160",
+      kmPerLiterHundredths: 1250,
+      active: true,
+    });
+    vehicleAId = vehicleA.id;
+
+    const vehicleB = await fleetRepository.create({
+      id: crypto.randomUUID(),
+      plate: "TST-0002",
+      model: "Moto Cargo 250",
+      kmPerLiterHundredths: 1000,
+      active: true,
+    });
+    vehicleBId = vehicleB.id;
 
     managerId = crypto.randomUUID();
     driverId = crypto.randomUUID();
@@ -719,6 +764,218 @@ describe("RoutesService", () => {
       await expect(routesService.restoreRoute(route.id)).rejects.toThrow(
         BadRequestError,
       );
+    });
+  });
+
+  describe("OSRM distance (RN07)", () => {
+    it("computes distance on creation as the sum of OSRM legs", async () => {
+      const result = await routesService.createRoute(
+        {
+          driverId,
+          vehicleId: null,
+          date: new Date().toISOString(),
+          stops: [
+            { pointId: pointId1, order: "1" },
+            { pointId: pointId2, order: "2" },
+            { pointId: pointId3, order: "3" },
+          ],
+        },
+        managerId,
+      );
+
+      expect(mockOsrm.routeLegDistancesKm).toHaveBeenCalledTimes(1);
+      expect(mockOsrm.routeLegDistancesKm).toHaveBeenCalledWith([
+        { longitude: -46.6333, latitude: -23.5505 },
+        { longitude: -46.6333, latitude: -23.5505 },
+        { longitude: -46.6333, latitude: -23.5505 },
+      ]);
+      expect(result.distanceKm).toBe(12);
+    });
+
+    it("uses zero distance for a single-stop route without calling OSRM", async () => {
+      const result = await routesService.createRoute(
+        {
+          driverId,
+          vehicleId: null,
+          date: new Date().toISOString(),
+          stops: [{ pointId: pointId1, order: "1" }],
+        },
+        managerId,
+      );
+
+      expect(mockOsrm.routeLegDistancesKm).not.toHaveBeenCalled();
+      expect(result.distanceKm).toBe(0);
+    });
+
+    it("leaves distance indeterminate when a stop has no coordinates", async () => {
+      mockGeocoder.geocode.mockResolvedValueOnce(null);
+      const ungeocodedPoint = await pointsService.createPoint({
+        name: "Sem coordenadas",
+        address: "Endereço desconhecido, São Paulo, SP",
+      });
+
+      const result = await routesService.createRoute(
+        {
+          driverId,
+          vehicleId: vehicleAId,
+          date: new Date().toISOString(),
+          stops: [
+            { pointId: pointId1, order: "1" },
+            { pointId: ungeocodedPoint.id, order: "2" },
+          ],
+        },
+        managerId,
+      );
+
+      expect(mockOsrm.routeLegDistancesKm).not.toHaveBeenCalled();
+      expect(result.distanceKm).toBeNull();
+      expect(result.cost).toBeNull();
+    });
+  });
+
+  describe("route cost (RN07)", () => {
+    it("computes cost from distance, fuel price and vehicle consumption", async () => {
+      const result = await routesService.createRoute(
+        {
+          driverId,
+          vehicleId: vehicleAId,
+          date: new Date().toISOString(),
+          stops: [
+            { pointId: pointId1, order: "1" },
+            { pointId: pointId2, order: "2" },
+            { pointId: pointId3, order: "3" },
+          ],
+        },
+        managerId,
+      );
+
+      expect(result.distanceKm).toBe(12);
+      expect(result.cost).toBe(5.76);
+    });
+
+    it("reads indeterminate when no vehicle is bound", async () => {
+      const result = await routesService.createRoute(
+        {
+          driverId,
+          vehicleId: null,
+          date: new Date().toISOString(),
+          stops: [
+            { pointId: pointId1, order: "1" },
+            { pointId: pointId2, order: "2" },
+          ],
+        },
+        managerId,
+      );
+
+      expect(result.distanceKm).toBe(12);
+      expect(result.cost).toBeNull();
+    });
+
+    it("recomputes cost when the bound vehicle changes", async () => {
+      const route = await routesService.createRoute(
+        {
+          driverId,
+          vehicleId: vehicleAId,
+          date: new Date().toISOString(),
+          stops: [
+            { pointId: pointId1, order: "1" },
+            { pointId: pointId2, order: "2" },
+          ],
+        },
+        managerId,
+      );
+      expect(route.cost).toBe(5.76);
+
+      const updated = await routesService.updateRoute(
+        route.id,
+        { vehicleId: vehicleBId },
+        managerId,
+      );
+      expect(updated.cost).toBe(7.2);
+    });
+  });
+
+  describe("distance override", () => {
+    it("creates a new audited route version (RNF05)", async () => {
+      const route = await routesService.createRoute(
+        {
+          driverId,
+          vehicleId: vehicleAId,
+          date: new Date().toISOString(),
+          stops: [
+            { pointId: pointId1, order: "1" },
+            { pointId: pointId2, order: "2" },
+          ],
+        },
+        managerId,
+      );
+
+      const updated = await routesService.updateRoute(
+        route.id,
+        { distanceKm: 15 },
+        managerId,
+      );
+
+      expect(updated.currentVersion).toBe("2");
+      expect(updated.distanceKm).toBe(15);
+
+      const history = await routesService.getRouteHistory(route.id);
+      expect(history.versions.length).toBe(2);
+      expect(history.versions[0].version).toBe("1");
+      expect(history.versions[0].distanceKm).toBe(12);
+      expect(history.versions[1].version).toBe("2");
+      expect(history.versions[1].distanceKm).toBe(15);
+    });
+
+    it("recomputes cost from the overridden distance", async () => {
+      const route = await routesService.createRoute(
+        {
+          driverId,
+          vehicleId: vehicleAId,
+          date: new Date().toISOString(),
+          stops: [
+            { pointId: pointId1, order: "1" },
+            { pointId: pointId2, order: "2" },
+          ],
+        },
+        managerId,
+      );
+      expect(route.cost).toBe(5.76);
+
+      const updated = await routesService.updateRoute(
+        route.id,
+        { distanceKm: 20 },
+        managerId,
+      );
+      expect(updated.distanceKm).toBe(20);
+      expect(updated.cost).toBe(9.6);
+    });
+
+    it("rejects overriding distance on a concluded route", async () => {
+      const route = await routesService.createRoute(
+        {
+          driverId,
+          vehicleId: null,
+          date: new Date().toISOString(),
+          stops: [{ pointId: pointId1, order: "1" }],
+        },
+        managerId,
+      );
+
+      await routesService.updateRoute(
+        route.id,
+        { status: "in_flight" },
+        managerId,
+      );
+      await routesService.updateRoute(
+        route.id,
+        { status: "concluded" },
+        managerId,
+      );
+
+      await expect(
+        routesService.updateRoute(route.id, { distanceKm: 10 }, managerId),
+      ).rejects.toThrow(BadRequestError);
     });
   });
 });

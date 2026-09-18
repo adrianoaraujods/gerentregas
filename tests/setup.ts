@@ -11,7 +11,12 @@ beforeEach(async () => {
       "account",
       "verification",
       "point",
-      "parameter"
+      "parameter",
+      "vehicle",
+      "route",
+      "route_version",
+      "stop",
+      "stop_version"
     CASCADE
   `);
 });
