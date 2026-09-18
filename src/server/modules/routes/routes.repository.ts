@@ -1,7 +1,7 @@
 import { and, count, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import type { Database } from "@/server/db";
-import { point } from "@/server/db/schemas/points";
 import { vehicle } from "@/server/db/schemas/fleet";
+import { point } from "@/server/db/schemas/points";
 import {
   route,
   routeVersion,
@@ -458,7 +458,10 @@ export class RoutesRepository {
       .orderBy(stopVersion.order);
   }
 
-  async updateStopArrival(stopId: string, arrivalAt: Date): Promise<Stop | null> {
+  async updateStopArrival(
+    stopId: string,
+    arrivalAt: Date,
+  ): Promise<Stop | null> {
     const [row] = await this.db
       .update(stop)
       .set({ arrivalAt, updatedAt: new Date() })
@@ -467,7 +470,10 @@ export class RoutesRepository {
     return row ?? null;
   }
 
-  async updateStopDeparture(stopId: string, departureAt: Date): Promise<Stop | null> {
+  async updateStopDeparture(
+    stopId: string,
+    departureAt: Date,
+  ): Promise<Stop | null> {
     const [row] = await this.db
       .update(stop)
       .set({ departureAt, updatedAt: new Date() })
@@ -515,8 +521,50 @@ export class RoutesRepository {
     const [row] = await this.db
       .select()
       .from(stop)
-      .where(and(eq(stop.routeId, routeId), eq(stop.order, "1"), isNull(stop.deletedAt)))
+      .where(
+        and(
+          eq(stop.routeId, routeId),
+          eq(stop.order, "1"),
+          isNull(stop.deletedAt),
+        ),
+      )
       .limit(1);
     return row ?? null;
+  }
+
+  async findStopWithRoute(
+    stopId: string,
+  ): Promise<{ stop: Stop; route: Route } | null> {
+    const [row] = await this.db
+      .select({
+        stop: stop,
+        route: route,
+      })
+      .from(stop)
+      .innerJoin(route, eq(stop.routeId, route.id))
+      .where(
+        and(
+          eq(stop.id, stopId),
+          isNull(stop.deletedAt),
+          isNull(route.deletedAt),
+        ),
+      )
+      .limit(1);
+    return row ?? null;
+  }
+
+  async isRouteInFlight(routeId: string): Promise<boolean> {
+    const [row] = await this.db
+      .select({ id: route.id })
+      .from(route)
+      .where(
+        and(
+          eq(route.id, routeId),
+          eq(route.status, "in_flight"),
+          isNull(route.deletedAt),
+        ),
+      )
+      .limit(1);
+    return !!row;
   }
 }

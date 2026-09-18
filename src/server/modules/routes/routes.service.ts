@@ -1,16 +1,24 @@
-import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from "@/server/api";
+import {
+  BadRequestError,
+  ConflictError,
+  ForbiddenError,
+  NotFoundError,
+} from "@/server/api";
 
 import type { RoutesRepository } from "./routes.repository";
 import type {
   AddStopInput,
-  CheckInInput,
-  CheckOutInput,
   CreateRouteInput,
   Route,
   RouteStatus,
   RouteWithStops,
   StartShiftInput,
   Stop,
+  SyncBatchInput,
+  SyncBatchOutput,
+  SyncEventResult,
+  SyncRejectReason,
+  SyncStopEventInput,
   UpdateRouteInput,
   UpdateStopInput,
 } from "./routes.types";
@@ -539,14 +547,18 @@ export class RoutesService {
     );
     if (!routeData) return null;
 
-    const routeWithStops = await this.repository.findRouteWithStops(routeData.id);
+    const routeWithStops = await this.repository.findRouteWithStops(
+      routeData.id,
+    );
     if (!routeWithStops) return null;
 
     const stopsWithDwell = routeWithStops.stops.map((stop) => {
       let dwellSeconds: number | undefined;
       if (stop.arrivalAt && stop.departureAt) {
         dwellSeconds = Math.floor(
-          (new Date(stop.departureAt).getTime() - new Date(stop.arrivalAt).getTime()) / 1000,
+          (new Date(stop.departureAt).getTime() -
+            new Date(stop.arrivalAt).getTime()) /
+            1000,
         );
       }
       return { ...stop, dwellSeconds };
@@ -578,7 +590,9 @@ export class RoutesService {
     }
 
     if (existingRoute.status !== "draft") {
-      throw new BadRequestError("A rota deve estar em status 'draft' para iniciar o turno.");
+      throw new BadRequestError(
+        "A rota deve estar em status 'draft' para iniciar o turno.",
+      );
     }
 
     const vehicleId = input.vehicleId ?? existingRoute.vehicleId;
@@ -586,14 +600,22 @@ export class RoutesService {
     if (!vehicleId) {
       const activeVehicleIds = await this.repository.findActiveVehicleIds();
       if (activeVehicleIds.length === 0) {
-        throw new BadRequestError("Nenhum veículo ativo disponível para seleção.");
+        throw new BadRequestError(
+          "Nenhum veículo ativo disponível para seleção.",
+        );
       }
       throw new BadRequestError("Selecione um veículo para iniciar o turno.");
     }
 
-    const isLocked = await this.repository.isVehicleLockedForDate(vehicleId, existingRoute.date, routeId);
+    const isLocked = await this.repository.isVehicleLockedForDate(
+      vehicleId,
+      existingRoute.date,
+      routeId,
+    );
     if (isLocked) {
-      throw new ConflictError("Este veículo já está em uso em outra rota nesta data.");
+      throw new ConflictError(
+        "Este veículo já está em uso em outra rota nesta data.",
+      );
     }
 
     const originStop = await this.repository.findOriginStop(routeId);
@@ -616,10 +638,16 @@ export class RoutesService {
 
     await this.createNewVersion(routeId, driverId, updatedRoute);
 
-    return this.getDriverRouteWithDwell(driverId, existingRoute.date) as Promise<RouteWithStops>;
+    return this.getDriverRouteWithDwell(
+      driverId,
+      existingRoute.date,
+    ) as Promise<RouteWithStops>;
   }
 
-  async checkIn(stopId: string, driverId: string): Promise<{ stop: Stop; dwellSeconds: number }> {
+  async checkIn(
+    stopId: string,
+    driverId: string,
+  ): Promise<{ stop: Stop; dwellSeconds: number }> {
     const stop = await this.repository.findStopById(stopId);
     if (!stop) {
       throw new NotFoundError("Parada não encontrada.");
@@ -631,15 +659,21 @@ export class RoutesService {
     }
 
     if (route.driverId !== driverId) {
-      throw new ForbiddenError("Esta parada não pertence à rota deste motorista.");
+      throw new ForbiddenError(
+        "Esta parada não pertence à rota deste motorista.",
+      );
     }
 
     if (route.status !== "in_flight") {
-      throw new BadRequestError("A rota deve estar em andamento para fazer check-in.");
+      throw new BadRequestError(
+        "A rota deve estar em andamento para fazer check-in.",
+      );
     }
 
     if (stop.order === "1") {
-      throw new BadRequestError("A parada de origem não possui check-in (RN01).");
+      throw new BadRequestError(
+        "A parada de origem não possui check-in (RN01).",
+      );
     }
 
     if (stop.arrivalAt) {
@@ -654,7 +688,10 @@ export class RoutesService {
     return { stop: updatedStop, dwellSeconds: 0 };
   }
 
-  async checkOut(stopId: string, driverId: string): Promise<{ stop: Stop; dwellSeconds: number }> {
+  async checkOut(
+    stopId: string,
+    driverId: string,
+  ): Promise<{ stop: Stop; dwellSeconds: number }> {
     const stop = await this.repository.findStopById(stopId);
     if (!stop) {
       throw new NotFoundError("Parada não encontrada.");
@@ -666,11 +703,15 @@ export class RoutesService {
     }
 
     if (route.driverId !== driverId) {
-      throw new ForbiddenError("Esta parada não pertence à rota deste motorista.");
+      throw new ForbiddenError(
+        "Esta parada não pertence à rota deste motorista.",
+      );
     }
 
     if (route.status !== "in_flight") {
-      throw new BadRequestError("A rota deve estar em andamento para fazer check-out.");
+      throw new BadRequestError(
+        "A rota deve estar em andamento para fazer check-out.",
+      );
     }
 
     if (!stop.arrivalAt) {
@@ -734,5 +775,168 @@ export class RoutesService {
     }
 
     await this.repository.updateRoute(routeId, { currentVersion: newVersion });
+  }
+
+  async syncBatch(
+    input: SyncBatchInput,
+    driverId: string,
+  ): Promise<SyncBatchOutput> {
+    const results: SyncEventResult[] = [];
+    let acceptedCount = 0;
+    let rejectedCount = 0;
+
+    const now = new Date();
+
+    for (const event of input.events) {
+      const eventTimestamp = new Date(event.timestamp);
+      const result = await this.validateAndProcessEvent(
+        event,
+        eventTimestamp,
+        driverId,
+        now,
+      );
+
+      if (result.accepted) {
+        acceptedCount++;
+      } else {
+        rejectedCount++;
+      }
+      results.push(result);
+    }
+
+    return { results, acceptedCount, rejectedCount };
+  }
+
+  private async validateAndProcessEvent(
+    event: SyncStopEventInput,
+    eventTimestamp: Date,
+    driverId: string,
+    now: Date,
+  ): Promise<SyncEventResult> {
+    const stopWithRoute = await this.repository.findStopWithRoute(event.stopId);
+
+    if (!stopWithRoute) {
+      return this.createRejectedResult(event, "STOP_NOT_FOUND", eventTimestamp);
+    }
+
+    const { stop, route } = stopWithRoute;
+
+    if (route.driverId !== driverId) {
+      return this.createRejectedResult(
+        event,
+        "STOP_NOT_IN_DRIVER_ROUTE",
+        eventTimestamp,
+      );
+    }
+
+    if (route.status !== "in_flight") {
+      return this.createRejectedResult(
+        event,
+        "ROUTE_NOT_IN_FLIGHT",
+        eventTimestamp,
+      );
+    }
+
+    if (eventTimestamp > now) {
+      return this.createRejectedResult(
+        event,
+        "FUTURE_TIMESTAMP",
+        eventTimestamp,
+      );
+    }
+
+    const routeDate = new Date(route.date);
+    const eventDate = new Date(eventTimestamp);
+    const routeStartOfDay = new Date(routeDate);
+    routeStartOfDay.setHours(0, 0, 0, 0);
+    const routeEndOfDay = new Date(routeDate);
+    routeEndOfDay.setHours(23, 59, 59, 999);
+
+    if (eventDate < routeStartOfDay || eventDate > routeEndOfDay) {
+      return this.createRejectedResult(
+        event,
+        "TIMESTAMP_OFF_ROUTE_DATE",
+        eventTimestamp,
+      );
+    }
+
+    if (event.type === "arrival") {
+      if (stop.arrivalAt) {
+        return this.createRejectedResult(
+          event,
+          "DUPLICATE_ARRIVAL_ON_CLOSED_STOP",
+          eventTimestamp,
+        );
+      }
+
+      if (stop.departureAt && eventTimestamp <= new Date(stop.departureAt)) {
+        return this.createRejectedResult(
+          event,
+          "DEPARTURE_BEFORE_ARRIVAL",
+          eventTimestamp,
+        );
+      }
+
+      await this.repository.updateStopArrival(stop.id, eventTimestamp);
+      return this.createAcceptedResult(event, eventTimestamp);
+    }
+
+    if (event.type === "departure") {
+      if (!stop.arrivalAt) {
+        return this.createRejectedResult(
+          event,
+          "DEPARTURE_BEFORE_ARRIVAL",
+          eventTimestamp,
+        );
+      }
+
+      if (eventTimestamp <= new Date(stop.arrivalAt)) {
+        return this.createRejectedResult(
+          event,
+          "DEPARTURE_BEFORE_ARRIVAL",
+          eventTimestamp,
+        );
+      }
+
+      if (stop.departureAt) {
+        return this.createRejectedResult(
+          event,
+          "DUPLICATE_ARRIVAL_ON_CLOSED_STOP",
+          eventTimestamp,
+        );
+      }
+
+      await this.repository.updateStopDeparture(stop.id, eventTimestamp);
+      return this.createAcceptedResult(event, eventTimestamp);
+    }
+
+    return this.createRejectedResult(event, "STOP_NOT_FOUND", eventTimestamp);
+  }
+
+  private createAcceptedResult(
+    event: SyncStopEventInput,
+    timestamp: Date,
+  ): SyncEventResult {
+    return {
+      stopId: event.stopId,
+      type: event.type,
+      accepted: true,
+      reason: null,
+      timestamp: timestamp.toISOString(),
+    };
+  }
+
+  private createRejectedResult(
+    event: SyncStopEventInput,
+    reason: SyncRejectReason,
+    timestamp: Date,
+  ): SyncEventResult {
+    return {
+      stopId: event.stopId,
+      type: event.type,
+      accepted: false,
+      reason,
+      timestamp: timestamp.toISOString(),
+    };
   }
 }

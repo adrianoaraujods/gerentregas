@@ -8,8 +8,8 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { user } from "./auth";
-import { point } from "./points";
 import { vehicle } from "./fleet";
+import { point } from "./points";
 
 export const routeStatusEnum = pgEnum("route_status", [
   "draft",
