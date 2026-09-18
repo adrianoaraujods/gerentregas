@@ -78,5 +78,8 @@
       "drizzle-kit": "$drizzle-kit",
       "drizzle-orm": "$drizzle-orm"
     }
+  },
+  "allowScripts": {
+    "esbuild@0.25.12": true
   }
 }
