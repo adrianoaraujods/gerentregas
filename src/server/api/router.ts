@@ -7,6 +7,7 @@ import { fleetRouter } from "@/server/modules/fleet";
 import { parametersRouter } from "@/server/modules/parameters";
 import { pointsRouter } from "@/server/modules/points";
 import { routesRouter } from "@/server/modules/routes";
+import { syncRouter } from "@/server/modules/sync";
 
 import { createCallerFactory, createRouter } from "./trpc";
 
@@ -23,6 +24,7 @@ export const appRouter = createRouter({
   parameters: parametersRouter,
   points: pointsRouter,
   routes: routesRouter,
+  sync: syncRouter,
 });
 
 /**
