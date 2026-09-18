@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Car01Icon,
   ChevronsLeftRightIcon,
   DashboardSquare01Icon,
   MapIcon,
@@ -39,6 +40,7 @@ const mainNav: Navlink[] = [
   },
   { label: "Roteiros", href: "/admin/roteiros", icon: MapIcon },
   { label: "Motoristas", href: "/admin/motoristas", icon: UserMultipleIcon },
+  { label: "Frota", href: "/admin/frota", icon: Car01Icon },
   { label: "Pontos", href: "/admin/pontos", icon: MapPinIcon },
 ];
 

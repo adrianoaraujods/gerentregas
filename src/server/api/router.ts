@@ -1,6 +1,7 @@
 import type { inferRouterInputs, inferRouterOutputs } from "@trpc/server";
 
 import { authRouter } from "@/server/modules/auth";
+import { fleetRouter } from "@/server/modules/fleet";
 import { parametersRouter } from "@/server/modules/parameters";
 
 import { createCallerFactory, createRouter } from "./trpc";
@@ -12,6 +13,7 @@ import { createCallerFactory, createRouter } from "./trpc";
  */
 export const appRouter = createRouter({
   auth: authRouter,
+  fleet: fleetRouter,
   parameters: parametersRouter,
 });
 

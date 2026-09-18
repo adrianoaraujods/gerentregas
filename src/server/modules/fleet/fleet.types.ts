@@ -1,0 +1,58 @@
+import { createInsertSchema, createSelectSchema } from "drizzle-orm/zod";
+import { z } from "zod";
+
+import { vehicle } from "@/server/db/schemas/fleet";
+
+export const vehicleSchema = createSelectSchema(vehicle);
+export type Vehicle = z.infer<typeof vehicleSchema>;
+
+export const newVehicleSchema = createInsertSchema(vehicle);
+export type NewVehicle = z.infer<typeof newVehicleSchema>;
+
+export const vehicleOutputSchema = z
+  .object({
+    id: z.string(),
+    plate: z.string(),
+    model: z.string(),
+    kmPerLiterHundredths: z.number(),
+    active: z.boolean(),
+    deletedAt: z.union([z.date(), z.string()]).nullable().optional(),
+    createdAt: z.union([z.date(), z.string()]),
+    updatedAt: z.union([z.date(), z.string()]),
+  })
+  .transform((v) => {
+    const { kmPerLiterHundredths, ...rest } = v;
+    return {
+      ...rest,
+      kmPerLiter: kmPerLiterHundredths / 100,
+    };
+  });
+export type VehicleOutput = z.infer<typeof vehicleOutputSchema>;
+
+export const createVehicleInputSchema = z.object({
+  plate: z.string().trim().min(1, "Placa é obrigatória"),
+  model: z.string().trim().min(1, "Modelo é obrigatório"),
+  kmPerLiter: z
+    .number()
+    .positive("Rendimento (km/L) deve ser um valor positivo"),
+  active: z.boolean().optional().default(true),
+});
+export type CreateVehicleInput = z.input<typeof createVehicleInputSchema>;
+
+export const updateVehicleInputSchema = z.object({
+  id: z.string().min(1, "ID é obrigatório"),
+  plate: z.string().trim().min(1, "Placa é obrigatória"),
+  model: z.string().trim().min(1, "Modelo é obrigatório"),
+  kmPerLiter: z
+    .number()
+    .positive("Rendimento (km/L) deve ser um valor positivo"),
+  active: z.boolean().optional(),
+});
+export type UpdateVehicleInput = z.infer<typeof updateVehicleInputSchema>;
+
+export const listVehiclesInputSchema = z
+  .object({
+    activeOnly: z.boolean().optional(),
+  })
+  .optional();
+export type ListVehiclesInput = z.infer<typeof listVehiclesInputSchema>;

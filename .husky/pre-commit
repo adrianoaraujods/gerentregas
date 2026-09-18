@@ -1,4 +1,2 @@
 lint-staged
 pnpm typecheck
-pnpm build
-pnpm test
