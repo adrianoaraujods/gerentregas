@@ -9,6 +9,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { user } from "./auth";
 import { point } from "./points";
+import { vehicle } from "./fleet";
 
 export const routeStatusEnum = pgEnum("route_status", [
   "draft",
@@ -29,7 +30,7 @@ export const route = pgTable(
     driverId: text("driver_id")
       .notNull()
       .references(() => user.id),
-    vehicleId: text("vehicle_id").references(() => user.id),
+    vehicleId: text("vehicle_id").references(() => vehicle.id),
     date: timestamp("date").notNull(),
     status: routeStatusEnum("status").notNull().default("draft"),
     currentVersion: text("current_version").notNull().default("1"),
@@ -65,7 +66,7 @@ export const routeVersion = pgTable(
     driverId: text("driver_id")
       .notNull()
       .references(() => user.id),
-    vehicleId: text("vehicle_id").references(() => user.id),
+    vehicleId: text("vehicle_id").references(() => vehicle.id),
     date: timestamp("date").notNull(),
     status: routeStatusEnum("status").notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -93,6 +94,8 @@ export const stop = pgTable(
     latitudeSnapshot: real("latitude_snapshot"),
     longitudeSnapshot: real("longitude_snapshot"),
     concludedAt: timestamp("concluded_at"),
+    arrivalAt: timestamp("arrival_at"),
+    departureAt: timestamp("departure_at"),
     deletedAt: timestamp("deleted_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
@@ -128,6 +131,8 @@ export const stopVersion = pgTable(
     latitudeSnapshot: real("latitude_snapshot"),
     longitudeSnapshot: real("longitude_snapshot"),
     concludedAt: timestamp("concluded_at"),
+    arrivalAt: timestamp("arrival_at"),
+    departureAt: timestamp("departure_at"),
     deletedAt: timestamp("deleted_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },

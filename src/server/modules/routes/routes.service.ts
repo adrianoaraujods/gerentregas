@@ -1,12 +1,15 @@
-import { BadRequestError, ConflictError, NotFoundError } from "@/server/api";
+import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from "@/server/api";
 
 import type { RoutesRepository } from "./routes.repository";
 import type {
   AddStopInput,
+  CheckInInput,
+  CheckOutInput,
   CreateRouteInput,
   Route,
   RouteStatus,
   RouteWithStops,
+  StartShiftInput,
   Stop,
   UpdateRouteInput,
   UpdateStopInput,
@@ -109,6 +112,8 @@ export class RoutesService {
         latitudeSnapshot: createdStop.latitudeSnapshot,
         longitudeSnapshot: createdStop.longitudeSnapshot,
         concludedAt: createdStop.concludedAt,
+        arrivalAt: createdStop.arrivalAt ?? null,
+        departureAt: createdStop.departureAt ?? null,
       });
     }
 
@@ -524,6 +529,171 @@ export class RoutesService {
     }
   }
 
+  async getDriverRouteWithDwell(
+    driverId: string,
+    date: Date,
+  ): Promise<RouteWithStops | null> {
+    const routeData = await this.repository.findRouteByDriverAndDate(
+      driverId,
+      date,
+    );
+    if (!routeData) return null;
+
+    const routeWithStops = await this.repository.findRouteWithStops(routeData.id);
+    if (!routeWithStops) return null;
+
+    const stopsWithDwell = routeWithStops.stops.map((stop) => {
+      let dwellSeconds: number | undefined;
+      if (stop.arrivalAt && stop.departureAt) {
+        dwellSeconds = Math.floor(
+          (new Date(stop.departureAt).getTime() - new Date(stop.arrivalAt).getTime()) / 1000,
+        );
+      }
+      return { ...stop, dwellSeconds };
+    });
+
+    const totalDwellSeconds = stopsWithDwell
+      .filter((s) => s.order !== "1" && s.dwellSeconds !== undefined)
+      .reduce((sum, s) => sum + (s.dwellSeconds ?? 0), 0);
+
+    return {
+      ...routeWithStops,
+      stops: stopsWithDwell,
+      totalDwellSeconds,
+    };
+  }
+
+  async startShift(
+    routeId: string,
+    input: StartShiftInput,
+    driverId: string,
+  ): Promise<RouteWithStops> {
+    const existingRoute = await this.repository.findRouteById(routeId);
+    if (!existingRoute) {
+      throw new NotFoundError("Rota não encontrada.");
+    }
+
+    if (existingRoute.driverId !== driverId) {
+      throw new ForbiddenError("Esta rota não pertence a este motorista.");
+    }
+
+    if (existingRoute.status !== "draft") {
+      throw new BadRequestError("A rota deve estar em status 'draft' para iniciar o turno.");
+    }
+
+    const vehicleId = input.vehicleId ?? existingRoute.vehicleId;
+
+    if (!vehicleId) {
+      const activeVehicleIds = await this.repository.findActiveVehicleIds();
+      if (activeVehicleIds.length === 0) {
+        throw new BadRequestError("Nenhum veículo ativo disponível para seleção.");
+      }
+      throw new BadRequestError("Selecione um veículo para iniciar o turno.");
+    }
+
+    const isLocked = await this.repository.isVehicleLockedForDate(vehicleId, existingRoute.date, routeId);
+    if (isLocked) {
+      throw new ConflictError("Este veículo já está em uso em outra rota nesta data.");
+    }
+
+    const originStop = await this.repository.findOriginStop(routeId);
+    if (!originStop) {
+      throw new BadRequestError("Parada de origem não encontrada.");
+    }
+
+    const now = new Date();
+    await this.repository.updateStopDeparture(originStop.id, now);
+
+    await this.repository.updateRoute(routeId, {
+      vehicleId,
+      status: "in_flight",
+    });
+
+    const updatedRoute = await this.repository.findRouteById(routeId);
+    if (!updatedRoute) {
+      throw new BadRequestError("Falha ao buscar rota atualizada.");
+    }
+
+    await this.createNewVersion(routeId, driverId, updatedRoute);
+
+    return this.getDriverRouteWithDwell(driverId, existingRoute.date) as Promise<RouteWithStops>;
+  }
+
+  async checkIn(stopId: string, driverId: string): Promise<{ stop: Stop; dwellSeconds: number }> {
+    const stop = await this.repository.findStopById(stopId);
+    if (!stop) {
+      throw new NotFoundError("Parada não encontrada.");
+    }
+
+    const route = await this.repository.findRouteById(stop.routeId);
+    if (!route) {
+      throw new NotFoundError("Rota não encontrada.");
+    }
+
+    if (route.driverId !== driverId) {
+      throw new ForbiddenError("Esta parada não pertence à rota deste motorista.");
+    }
+
+    if (route.status !== "in_flight") {
+      throw new BadRequestError("A rota deve estar em andamento para fazer check-in.");
+    }
+
+    if (stop.order === "1") {
+      throw new BadRequestError("A parada de origem não possui check-in (RN01).");
+    }
+
+    if (stop.arrivalAt) {
+      throw new BadRequestError("Check-in já realizado para esta parada.");
+    }
+
+    const now = new Date();
+    const updatedStop = await this.repository.updateStopArrival(stopId, now);
+    if (!updatedStop) {
+      throw new BadRequestError("Falha ao realizar check-in.");
+    }
+    return { stop: updatedStop, dwellSeconds: 0 };
+  }
+
+  async checkOut(stopId: string, driverId: string): Promise<{ stop: Stop; dwellSeconds: number }> {
+    const stop = await this.repository.findStopById(stopId);
+    if (!stop) {
+      throw new NotFoundError("Parada não encontrada.");
+    }
+
+    const route = await this.repository.findRouteById(stop.routeId);
+    if (!route) {
+      throw new NotFoundError("Rota não encontrada.");
+    }
+
+    if (route.driverId !== driverId) {
+      throw new ForbiddenError("Esta parada não pertence à rota deste motorista.");
+    }
+
+    if (route.status !== "in_flight") {
+      throw new BadRequestError("A rota deve estar em andamento para fazer check-out.");
+    }
+
+    if (!stop.arrivalAt) {
+      throw new BadRequestError("Check-in não realizado para esta parada.");
+    }
+
+    if (stop.departureAt) {
+      throw new BadRequestError("Check-out já realizado para esta parada.");
+    }
+
+    const now = new Date();
+    const updatedStop = await this.repository.updateStopDeparture(stopId, now);
+    if (!updatedStop) {
+      throw new BadRequestError("Falha ao realizar check-out.");
+    }
+
+    const dwellSeconds = Math.floor(
+      (now.getTime() - new Date(stop.arrivalAt).getTime()) / 1000,
+    );
+
+    return { stop: updatedStop, dwellSeconds };
+  }
+
   private async createNewVersion(
     routeId: string,
     managerId: string,
@@ -558,6 +728,8 @@ export class RoutesService {
         latitudeSnapshot: stopItem.latitudeSnapshot,
         longitudeSnapshot: stopItem.longitudeSnapshot,
         concludedAt: stopItem.concludedAt,
+        arrivalAt: stopItem.arrivalAt,
+        departureAt: stopItem.departureAt,
       });
     }
 

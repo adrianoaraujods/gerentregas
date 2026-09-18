@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { BadRequestError, ConflictError, NotFoundError } from "@/server/api";
+import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from "@/server/api";
 import { db } from "@/server/db";
 import { user } from "@/server/db/schemas/auth";
 import { encrypt } from "@/server/lib/crypto";
@@ -719,6 +719,301 @@ describe("RoutesService", () => {
       await expect(routesService.restoreRoute(route.id)).rejects.toThrow(
         BadRequestError,
       );
+    });
+  });
+
+  describe("Driver day flow (dwell engine)", () => {
+    let vehicleId: string;
+    let routeId: string;
+    let originStopId: string;
+    let stop2Id: string;
+    let stop3Id: string;
+
+    beforeEach(async () => {
+      const { vehicle } = await import("@/server/db/schemas/fleet");
+      const vehicleResult = await db
+        .insert(vehicle)
+        .values({
+          id: crypto.randomUUID(),
+          plate: `TEST-${crypto.randomUUID().slice(0, 8)}`,
+          model: "Test Vehicle",
+          kmPerLiterHundredths: 1000,
+          active: true,
+        })
+        .returning();
+      vehicleId = vehicleResult[0].id;
+
+      const date = new Date();
+      const route = await routesService.createRoute(
+        {
+          driverId,
+          vehicleId: null,
+          date: date.toISOString(),
+          stops: [
+            { pointId: pointId1, order: "1" },
+            { pointId: pointId2, order: "2" },
+            { pointId: pointId3, order: "3" },
+          ],
+        },
+        managerId,
+      );
+      routeId = route.id;
+      originStopId = route.stops[0].id;
+      stop2Id = route.stops[1].id;
+      stop3Id = route.stops[2].id;
+    });
+
+    describe("startShift", () => {
+      it("starts shift with vehicle selection, records origin departure, locks vehicle, transitions to in_flight", async () => {
+        const result = await routesService.startShift(routeId, { vehicleId }, driverId);
+
+        expect(result.status).toBe("in_flight");
+        expect(result.vehicleId).toBe(vehicleId);
+        expect(result.stops[0].departureAt).not.toBeNull();
+        expect(result.stops[0].arrivalAt).toBeNull();
+      });
+
+      it("uses pre-assigned vehicle when available", async () => {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const routeWithVehicle = await routesService.createRoute(
+          {
+            driverId,
+            vehicleId,
+            date: tomorrow.toISOString(),
+            stops: [{ pointId: pointId1, order: "1" }],
+          },
+          managerId,
+        );
+
+        const result = await routesService.startShift(routeWithVehicle.id, { vehicleId: null }, driverId);
+
+        expect(result.vehicleId).toBe(vehicleId);
+        expect(result.status).toBe("in_flight");
+      });
+
+      it("rejects when vehicle is locked by another route on same date", async () => {
+        const otherDriverId = crypto.randomUUID();
+        await db.insert(user).values({
+          id: otherDriverId,
+          name: "Other Driver",
+          email: "other2@test.com",
+          emailVerified: true,
+          role: "driver",
+          document: encrypt("22222222222"),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+
+        const otherRoute = await routesService.createRoute(
+          {
+            driverId: otherDriverId,
+            vehicleId,
+            date: new Date().toISOString(),
+            stops: [{ pointId: pointId2, order: "1" }],
+          },
+          managerId,
+        );
+        await routesService.startShift(otherRoute.id, { vehicleId }, otherDriverId);
+
+        await expect(
+          routesService.startShift(routeId, { vehicleId }, driverId),
+        ).rejects.toThrow(ConflictError);
+      });
+
+      it("rejects when route is not in draft status", async () => {
+        await routesService.startShift(routeId, { vehicleId }, driverId);
+
+        await expect(
+          routesService.startShift(routeId, { vehicleId }, driverId),
+        ).rejects.toThrow(BadRequestError);
+      });
+
+      it("rejects when no vehicle provided and no pre-assigned vehicle", async () => {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const routeNoVehicle = await routesService.createRoute(
+          {
+            driverId,
+            vehicleId: null,
+            date: tomorrow.toISOString(),
+            stops: [{ pointId: pointId1, order: "1" }],
+          },
+          managerId,
+        );
+
+        await expect(
+          routesService.startShift(routeNoVehicle.id, { vehicleId: null }, driverId),
+        ).rejects.toThrow("Selecione um veículo");
+      });
+
+      it("rejects when driver tries to start another driver's route", async () => {
+        const otherDriverId = crypto.randomUUID();
+        await db.insert(user).values({
+          id: otherDriverId,
+          name: "Other Driver",
+          email: "other3@test.com",
+          emailVerified: true,
+          role: "driver",
+          document: encrypt("33333333333"),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+
+        await expect(
+          routesService.startShift(routeId, { vehicleId }, otherDriverId),
+        ).rejects.toThrow(ForbiddenError);
+      });
+
+      it("creates new version on shift start (RNF05)", async () => {
+        await routesService.startShift(routeId, { vehicleId }, driverId);
+
+        const history = await routesService.getRouteHistory(routeId);
+        expect(history.versions.length).toBe(2);
+        expect(history.versions[1].version).toBe("2");
+        expect(history.versions[1].vehicleId).toBe(vehicleId);
+        expect(history.versions[1].status).toBe("in_flight");
+      });
+    });
+
+    describe("checkIn/checkOut", () => {
+      beforeEach(async () => {
+        await routesService.startShift(routeId, { vehicleId }, driverId);
+      });
+
+      it("checkIn records arrivalAt for non-origin stop", async () => {
+        const result = await routesService.checkIn(stop2Id, driverId);
+
+        expect(result.stop.arrivalAt).not.toBeNull();
+        expect(result.stop.departureAt).toBeNull();
+      });
+
+      it("rejects checkIn for origin stop (RN01)", async () => {
+        await expect(routesService.checkIn(originStopId, driverId)).rejects.toThrow(
+          "A parada de origem não possui check-in",
+        );
+      });
+
+      it("rejects double checkIn", async () => {
+        await routesService.checkIn(stop2Id, driverId);
+
+        await expect(routesService.checkIn(stop2Id, driverId)).rejects.toThrow(
+          "Check-in já realizado",
+        );
+      });
+
+      it("rejects checkIn when route not in_flight", async () => {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const draftRoute = await routesService.createRoute(
+          {
+            driverId,
+            vehicleId: null,
+            date: tomorrow.toISOString(),
+            stops: [{ pointId: pointId1, order: "1" }, { pointId: pointId2, order: "2" }],
+          },
+          managerId,
+        );
+
+        await expect(
+          routesService.checkIn(draftRoute.stops[1].id, driverId),
+        ).rejects.toThrow("A rota deve estar em andamento");
+      });
+
+      it("checkOut records departureAt and returns dwellSeconds", async () => {
+        await routesService.checkIn(stop2Id, driverId);
+
+        const { stop, dwellSeconds } = await routesService.checkOut(stop2Id, driverId);
+
+        expect(stop.departureAt).not.toBeNull();
+        expect(dwellSeconds).toBeGreaterThanOrEqual(0);
+      });
+
+      it("rejects checkOut without checkIn", async () => {
+        await expect(routesService.checkOut(stop2Id, driverId)).rejects.toThrow(
+          "Check-in não realizado",
+        );
+      });
+
+      it("rejects double checkOut", async () => {
+        await routesService.checkIn(stop2Id, driverId);
+        await routesService.checkOut(stop2Id, driverId);
+
+        await expect(routesService.checkOut(stop2Id, driverId)).rejects.toThrow(
+          "Check-out já realizado",
+        );
+      });
+
+      it("rejects checkOut when route not in_flight", async () => {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const draftRoute = await routesService.createRoute(
+          {
+            driverId,
+            vehicleId: null,
+            date: tomorrow.toISOString(),
+            stops: [{ pointId: pointId1, order: "1" }, { pointId: pointId2, order: "2" }],
+          },
+          managerId,
+        );
+        // Don't start shift, so route stays in draft
+        // Try checkOut directly - should fail because route not in_flight
+        await expect(
+          routesService.checkOut(draftRoute.stops[1].id, driverId),
+        ).rejects.toThrow("A rota deve estar em andamento");
+      });
+
+      it("rejects checkIn/checkOut for another driver's route", async () => {
+        const otherDriverId = crypto.randomUUID();
+        await db.insert(user).values({
+          id: otherDriverId,
+          name: "Other Driver",
+          email: "other4@test.com",
+          emailVerified: true,
+          role: "driver",
+          document: encrypt("44444444444"),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+
+        await expect(routesService.checkIn(stop2Id, otherDriverId)).rejects.toThrow(
+          ForbiddenError,
+        );
+      });
+    });
+
+    describe("getDriverRouteWithDwell", () => {
+      it("returns dwellSeconds per stop and totalDwellSeconds excluding origin (RN03)", async () => {
+        await routesService.startShift(routeId, { vehicleId }, driverId);
+        await routesService.checkIn(stop2Id, driverId);
+        await new Promise((r) => setTimeout(r, 1100));
+        await routesService.checkOut(stop2Id, driverId);
+
+        await routesService.checkIn(stop3Id, driverId);
+        await new Promise((r) => setTimeout(r, 1100));
+        await routesService.checkOut(stop3Id, driverId);
+
+        const result = await routesService.getDriverRouteWithDwell(driverId, new Date());
+
+        expect(result).not.toBeNull();
+        expect(result!.totalDwellSeconds).toBeGreaterThan(0);
+        expect(result!.stops[0].dwellSeconds).toBeUndefined();
+        expect(result!.stops[1].dwellSeconds).toBeDefined();
+        expect(result!.stops[2].dwellSeconds).toBeDefined();
+        expect(result!.totalDwellSeconds).toBe(
+          (result!.stops[1].dwellSeconds ?? 0) + (result!.stops[2].dwellSeconds ?? 0),
+        );
+      });
+
+      it("origin has departureAt but no arrivalAt or dwellSeconds", async () => {
+        await routesService.startShift(routeId, { vehicleId }, driverId);
+
+        const result = await routesService.getDriverRouteWithDwell(driverId, new Date());
+
+        expect(result!.stops[0].departureAt).not.toBeNull();
+        expect(result!.stops[0].arrivalAt).toBeNull();
+        expect(result!.stops[0].dwellSeconds).toBeUndefined();
+      });
     });
   });
 });
