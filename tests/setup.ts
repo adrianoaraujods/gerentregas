@@ -9,7 +9,8 @@ beforeEach(async () => {
       "user",
       "session",
       "account",
-      "verification"
+      "verification",
+      "point"
     CASCADE
   `);
 });

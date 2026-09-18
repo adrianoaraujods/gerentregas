@@ -1,8 +1,11 @@
 import type { inferRouterInputs, inferRouterOutputs } from "@trpc/server";
 
 import { authRouter } from "@/server/modules/auth";
+import { driversRouter } from "@/server/modules/drivers";
 import { fleetRouter } from "@/server/modules/fleet";
 import { parametersRouter } from "@/server/modules/parameters";
+import { pointsRouter } from "@/server/modules/points";
+import { routesRouter } from "@/server/modules/routes";
 
 import { createCallerFactory, createRouter } from "./trpc";
 
@@ -13,8 +16,11 @@ import { createCallerFactory, createRouter } from "./trpc";
  */
 export const appRouter = createRouter({
   auth: authRouter,
+  drivers: driversRouter,
   fleet: fleetRouter,
   parameters: parametersRouter,
+  points: pointsRouter,
+  routes: routesRouter,
 });
 
 /**
