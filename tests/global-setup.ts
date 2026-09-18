@@ -25,7 +25,7 @@ export async function setup() {
   await client.query(`CREATE DATABASE ${testDbName}`);
   await client.end();
 
-  execSync("pnpm db:push", {
+  execSync("npm run db:push", {
     cwd: process.cwd(),
     stdio: "inherit",
   });
