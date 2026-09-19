@@ -19,6 +19,11 @@ export const routeStatusEnum = pgEnum("route_status", [
   "cancelled",
 ]);
 
+export const stopVersionTypeEnum = pgEnum("stop_version_type", [
+  "structural",
+  "correction",
+]);
+
 export const route = pgTable(
   "route",
   {
@@ -137,6 +142,10 @@ export const stopVersion = pgTable(
     arrivalAt: timestamp("arrival_at"),
     departureAt: timestamp("departure_at"),
     deletedAt: timestamp("deleted_at"),
+    versionType: stopVersionTypeEnum("version_type")
+      .notNull()
+      .default("structural"),
+    actorId: text("actor_id").references(() => user.id),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [

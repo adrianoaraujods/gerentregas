@@ -87,6 +87,7 @@ export const routeVersionWithStopsOutputSchema =
     stops: z.array(
       stopVersionSchema.extend({
         point: pointOutputSchema.nullable(),
+        actorName: z.string().nullable().optional(),
       }),
     ),
   });
@@ -210,3 +211,19 @@ export const checkOutInputSchema = z.object({
   stopId: z.string().uuid("ID da parada inválido"),
 });
 export type CheckOutInput = z.infer<typeof checkOutInputSchema>;
+
+export const correctTimestampsInputSchema = z.object({
+  arrivalAt: z
+    .union([z.string().datetime({ offset: true }), z.date()])
+    .optional()
+    .nullable()
+    .transform((val) => (val ? new Date(val) : null)),
+  departureAt: z
+    .union([z.string().datetime({ offset: true }), z.date()])
+    .optional()
+    .nullable()
+    .transform((val) => (val ? new Date(val) : null)),
+});
+export type CorrectTimestampsInput = z.infer<
+  typeof correctTimestampsInputSchema
+>;

@@ -88,6 +88,8 @@ export class RoutesRepository {
     concludedAt: Date | null;
     arrivalAt: Date | null;
     departureAt: Date | null;
+    versionType?: "structural" | "correction";
+    actorId?: string | null;
   }): Promise<StopVersion | null> {
     const [row] = await this.db
       .insert(stopVersion)
@@ -462,6 +464,11 @@ export class RoutesRepository {
       .select({
         stopVersion: stopVersion,
         point: point,
+        actorName: sql<
+          string | null
+        >`(SELECT name FROM "user" WHERE id = ${stopVersion.actorId})`.as(
+          "actor_name",
+        ),
       })
       .from(stopVersion)
       .leftJoin(point, eq(stopVersion.pointId, point.id))

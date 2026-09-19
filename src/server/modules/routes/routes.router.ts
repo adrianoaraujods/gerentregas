@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   adminProcedure,
+  authenticatedProcedure,
   createRouter,
   driverProcedure,
   managerProcedure,
@@ -12,6 +13,7 @@ import {
   addStopInputSchema,
   checkInInputSchema,
   checkOutInputSchema,
+  correctTimestampsInputSchema,
   createRouteInputSchema,
   driverRouteOutputSchema,
   listRoutesInputSchema,
@@ -173,4 +175,27 @@ export const routesRouter = createRouter({
     .mutation(({ ctx: { db, session }, input }) =>
       createController(db).checkOut(input.stopId, session.user.id),
     ),
+
+  correctTimestamps: authenticatedProcedure
+    .input(
+      z
+        .object({
+          routeId: z.string().uuid(),
+          stopId: z.string().uuid(),
+        })
+        .merge(correctTimestampsInputSchema),
+    )
+    .mutation(({ ctx: { db, session }, input }) => {
+      const { routeId, stopId, ...data } = input;
+      const isManager = ["manager", "admin"].includes(
+        session.user.role as string,
+      );
+      return createController(db).correctTimestamps(
+        routeId,
+        stopId,
+        data,
+        session.user.id,
+        isManager,
+      );
+    }),
 });

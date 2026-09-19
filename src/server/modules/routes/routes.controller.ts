@@ -6,6 +6,7 @@ import { RoutesRepository } from "./routes.repository";
 import { RoutesService } from "./routes.service";
 import type {
   AddStopInput,
+  CorrectTimestampsInput,
   CreateRouteInput,
   DriverRouteOutput,
   ListRoutesInput,
@@ -21,12 +22,14 @@ import {
   addStopInputSchema,
   checkInInputSchema,
   checkOutInputSchema,
+  correctTimestampsInputSchema,
   createRouteInputSchema,
   driverRouteOutputSchema,
   routeHistoryOutputSchema,
   routesListOutputSchema,
   routeWithStopsOutputSchema,
   startShiftInputSchema,
+  stopOutputSchema,
   updateRouteInputSchema,
   updateStopInputSchema,
 } from "./routes.types";
@@ -139,6 +142,24 @@ export class RoutesController {
   async getRouteHistory(routeId: string): Promise<RouteHistoryOutput> {
     const result = await this.service.getRouteHistory(routeId);
     return routeHistoryOutputSchema.parse(result);
+  }
+
+  async correctTimestamps(
+    routeId: string,
+    stopId: string,
+    input: CorrectTimestampsInput,
+    actorId: string,
+    isManager: boolean,
+  ) {
+    const validated = correctTimestampsInputSchema.parse(input);
+    const result = await this.service.correctTimestamps(
+      routeId,
+      stopId,
+      validated,
+      actorId,
+      isManager,
+    );
+    return result ? stopOutputSchema.parse(result) : null;
   }
 
   async getDriverRouteWithDwell(

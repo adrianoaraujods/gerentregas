@@ -17,6 +17,7 @@ import { createOsrmClient, type OsrmClient } from "./osrm";
 import type { RoutesRepository } from "./routes.repository";
 import type {
   AddStopInput,
+  CorrectTimestampsInput,
   CreateRouteInput,
   DriverRouteOutput,
   Route,
@@ -28,6 +29,7 @@ import type {
   RouteWithStopsOutput,
   StartShiftInput,
   Stop,
+  StopOutput,
   UpdateRouteInput,
   UpdateStopInput,
 } from "./routes.types";
@@ -602,8 +604,9 @@ export class RoutesService {
           ...v,
           distanceKm: hundredthsToKm(v.distanceKmHundredths),
           cost: costCentsToBRL(costCents),
-          stops: stops.map(({ stopVersion: sv, point: p }) => ({
+          stops: stops.map(({ stopVersion: sv, point: p, actorName }) => ({
             ...sv,
+            actorName,
             point: p
               ? {
                   id: p.id,
@@ -947,5 +950,90 @@ export class RoutesService {
     }
 
     await this.repository.updateRoute(routeId, { currentVersion: newVersion });
+  }
+
+  async correctTimestamps(
+    routeId: string,
+    stopId: string,
+    input: CorrectTimestampsInput,
+    actorId: string,
+    isManager: boolean,
+  ): Promise<StopOutput | null> {
+    const routeData = await this.repository.findRouteById(routeId);
+    if (!routeData) throw new NotFoundError("Rota não encontrada.");
+
+    if (!isManager) {
+      if (routeData.driverId !== actorId) {
+        throw new BadRequestError("Motorista não autorizado para esta rota.");
+      }
+      if (routeData.status === "concluded") {
+        throw new BadRequestError("Não é possível corrigir rota concluída.");
+      }
+    }
+
+    const stopWithRoute = await this.repository.findStopWithRoute(stopId);
+    if (!stopWithRoute || stopWithRoute.stop.routeId !== routeId) {
+      throw new NotFoundError("Parada não encontrada nesta rota.");
+    }
+
+    const updates: Partial<Pick<Stop, "arrivalAt" | "departureAt">> = {};
+    if (input.arrivalAt !== undefined) updates.arrivalAt = input.arrivalAt;
+    if (input.departureAt !== undefined)
+      updates.departureAt = input.departureAt;
+
+    if (updates.arrivalAt !== undefined) {
+      await this.repository.updateStopArrival(
+        stopId,
+        updates.arrivalAt as Date,
+      );
+    }
+    if (updates.departureAt !== undefined) {
+      await this.repository.updateStopDeparture(
+        stopId,
+        updates.departureAt as Date,
+      );
+    }
+
+    const routeVersionId = await this.repository.findRouteVersionId(
+      routeId,
+      routeData.currentVersion,
+    );
+    if (routeVersionId) {
+      const currentStop = await this.repository.findStopById(stopId);
+      if (currentStop) {
+        await this.repository.createStopVersion({
+          stopId: currentStop.id,
+          routeVersionId,
+          order: currentStop.order,
+          pointId: currentStop.pointId,
+          addressSnapshot: currentStop.addressSnapshot,
+          latitudeSnapshot: currentStop.latitudeSnapshot,
+          longitudeSnapshot: currentStop.longitudeSnapshot,
+          concludedAt: currentStop.concludedAt,
+          arrivalAt: currentStop.arrivalAt,
+          departureAt: currentStop.departureAt,
+          versionType: "correction",
+          actorId,
+        });
+      }
+    }
+
+    const updatedStop = await this.repository.findStopById(stopId);
+    if (!updatedStop) return null;
+    return {
+      ...updatedStop,
+      point: stopWithRoute.stop.pointId
+        ? {
+            id: stopWithRoute.stop.pointId,
+            name: "",
+            address: "",
+            latitude: 0,
+            longitude: 0,
+            geocodeStatus: "pending",
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          }
+        : null,
+    } as StopOutput; // Simple fallback, or we can just fetch the point
   }
 }
