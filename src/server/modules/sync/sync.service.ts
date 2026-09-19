@@ -29,10 +29,18 @@ export class SyncService {
   ): Promise<SyncBatchOutput> {
     const accepted: SyncBatchOutput["accepted"] = [];
     const rejected: SyncRejectedItem[] = [];
+    const processedStopIds = new Set<string>();
 
     for (const item of input.items) {
       const arrival = new Date(item.arrival);
       const departure = new Date(item.departure);
+
+      if (processedStopIds.has(item.stopId)) {
+        rejected.push(
+          this.buildRejection(item, "DUPLICATE_ARRIVAL_ON_CLOSED_STOP"),
+        );
+        continue;
+      }
 
       const validation = await this.validateItem(
         item,
@@ -45,14 +53,10 @@ export class SyncService {
         continue;
       }
 
-      const closed = await this.repository.concludeStopIfOpen(
-        item.stopId,
-        departure,
-      );
-      if (!closed) {
-        rejected.push(this.buildRejection(item, "stop_already_closed"));
-        continue;
-      }
+      await this.repository.updateStopArrival(item.stopId, arrival);
+      await this.repository.updateStopDeparture(item.stopId, departure);
+
+      processedStopIds.add(item.stopId);
 
       await this.transitionRouteStatus(validation.state.route.id);
 
@@ -97,28 +101,40 @@ export class SyncService {
     | { ok: false; reason: SyncRejectionReason }
   > {
     if (departure.getTime() <= arrival.getTime()) {
-      return { ok: false, reason: "departure_before_arrival" };
+      return { ok: false, reason: "DEPARTURE_BEFORE_ARRIVAL" };
     }
 
     const now = Date.now();
     if (arrival.getTime() > now || departure.getTime() > now) {
-      return { ok: false, reason: "future_timestamp" };
+      return { ok: false, reason: "FUTURE_TIMESTAMP" };
     }
 
     const state = await this.repository.findStopWithRoute(item.stopId);
-    if (!state || state.route.driverId !== driverId) {
-      return { ok: false, reason: "stop_not_in_route" };
+    if (!state) {
+      return { ok: false, reason: "STOP_NOT_FOUND" };
+    }
+
+    if (state.route.driverId !== driverId) {
+      return { ok: false, reason: "STOP_NOT_IN_DRIVER_ROUTE" };
+    }
+
+    if (!state.route.id) {
+      return { ok: false, reason: "ROUTE_NOT_FOUND" };
+    }
+
+    if (state.route.status !== "in_flight") {
+      return { ok: false, reason: "ROUTE_NOT_IN_FLIGHT" };
     }
 
     if (
       !isSameLocalDate(arrival, state.route.date) ||
       !isSameLocalDate(departure, state.route.date)
     ) {
-      return { ok: false, reason: "off_route_date" };
+      return { ok: false, reason: "TIMESTAMP_OFF_ROUTE_DATE" };
     }
 
     if (state.stop.concludedAt) {
-      return { ok: false, reason: "stop_already_closed" };
+      return { ok: false, reason: "DUPLICATE_ARRIVAL_ON_CLOSED_STOP" };
     }
 
     return { ok: true, state };
@@ -133,7 +149,7 @@ export class SyncService {
     }
 
     const openStops = await this.repository.countOpenStops(routeId);
-    if ((status === "draft" || status === "in_flight") && openStops === 0) {
+    if (status === "in_flight" && openStops === 0) {
       await this.repository.updateRouteStatus(routeId, "concluded");
     }
   }

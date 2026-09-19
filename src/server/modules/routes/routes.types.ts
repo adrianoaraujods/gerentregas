@@ -27,8 +27,6 @@ export type StopVersion = z.infer<typeof stopVersionSchema>;
 
 export const stopWithPointSchema = stopSchema.extend({
   point: pointOutputSchema.nullable(),
-  arrivalAt: z.date().nullable().optional(),
-  departureAt: z.date().nullable().optional(),
   dwellSeconds: z.number().int().nonnegative().optional(),
 });
 export type StopWithPoint = z.infer<typeof stopWithPointSchema>;
@@ -212,48 +210,3 @@ export const checkOutInputSchema = z.object({
   stopId: z.string().uuid("ID da parada inválido"),
 });
 export type CheckOutInput = z.infer<typeof checkOutInputSchema>;
-
-export const syncStopEventTypeEnum = z.enum(["arrival", "departure"]);
-export type SyncStopEventType = z.infer<typeof syncStopEventTypeEnum>;
-
-export const syncStopEventInputSchema = z.object({
-  stopId: z.string().uuid("ID da parada inválido"),
-  type: syncStopEventTypeEnum,
-  timestamp: z.iso.datetime({ local: true }),
-});
-export type SyncStopEventInput = z.infer<typeof syncStopEventInputSchema>;
-
-export const syncBatchInputSchema = z.object({
-  events: z
-    .array(syncStopEventInputSchema)
-    .min(1, "Pelo menos um evento é obrigatório"),
-});
-export type SyncBatchInput = z.infer<typeof syncBatchInputSchema>;
-
-export const syncRejectReasonEnum = z.enum([
-  "DEPARTURE_BEFORE_ARRIVAL",
-  "TIMESTAMP_OFF_ROUTE_DATE",
-  "DUPLICATE_ARRIVAL_ON_CLOSED_STOP",
-  "STOP_NOT_IN_DRIVER_ROUTE",
-  "FUTURE_TIMESTAMP",
-  "STOP_NOT_FOUND",
-  "ROUTE_NOT_FOUND",
-  "ROUTE_NOT_IN_FLIGHT",
-]);
-export type SyncRejectReason = z.infer<typeof syncRejectReasonEnum>;
-
-export const syncEventResultSchema = z.object({
-  stopId: z.string().uuid(),
-  type: syncStopEventTypeEnum,
-  accepted: z.boolean(),
-  reason: syncRejectReasonEnum.nullable(),
-  timestamp: z.iso.datetime({ local: true }),
-});
-export type SyncEventResult = z.infer<typeof syncEventResultSchema>;
-
-export const syncBatchOutputSchema = z.object({
-  results: z.array(syncEventResultSchema),
-  acceptedCount: z.number().int().nonnegative(),
-  rejectedCount: z.number().int().nonnegative(),
-});
-export type SyncBatchOutput = z.infer<typeof syncBatchOutputSchema>;

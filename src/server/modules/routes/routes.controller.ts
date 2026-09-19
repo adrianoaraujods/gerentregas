@@ -14,8 +14,6 @@ import type {
   RouteWithStopsOutput,
   StartShiftInput,
   Stop,
-  SyncBatchInput,
-  SyncBatchOutput,
   UpdateRouteInput,
   UpdateStopInput,
 } from "./routes.types";
@@ -175,12 +173,5 @@ export class RoutesController {
   ): Promise<{ stop: Stop; dwellSeconds: number }> {
     const validated = checkOutInputSchema.parse({ stopId });
     return this.service.checkOut(validated.stopId, driverId);
-  }
-
-  async syncBatch(
-    input: SyncBatchInput,
-    driverId: string,
-  ): Promise<SyncBatchOutput> {
-    return this.service.syncBatch(input, driverId);
   }
 }

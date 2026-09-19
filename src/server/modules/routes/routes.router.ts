@@ -19,8 +19,6 @@ import {
   routesListOutputSchema,
   routeWithStopsOutputSchema,
   startShiftInputSchema,
-  syncBatchInputSchema,
-  syncBatchOutputSchema,
   updateRouteInputSchema,
   updateStopInputSchema,
 } from "./routes.types";
@@ -174,13 +172,5 @@ export const routesRouter = createRouter({
     .input(checkOutInputSchema)
     .mutation(({ ctx: { db, session }, input }) =>
       createController(db).checkOut(input.stopId, session.user.id),
-    ),
-
-  sync: driverProcedure
-    .input(syncBatchInputSchema)
-    .mutation(({ ctx: { db, session }, input }) =>
-      createController(db)
-        .syncBatch(input, session.user.id)
-        .then(syncBatchOutputSchema.parse),
     ),
 });
