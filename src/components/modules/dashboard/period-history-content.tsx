@@ -1,6 +1,5 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import * as React from "react";
@@ -15,31 +14,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { api } from "@/lib/api/client";
+import type { GetAggregationInput } from "@/server/modules/dashboard";
 import { CsvExportButton } from "./csv-export";
 import { PeriodSelector } from "./period-selector";
 
 type PeriodType = "day" | "month" | "custom";
-
-interface DrilldownStop {
-  routeId: string;
-  driverId: string;
-  driverName: string;
-  stopId: string;
-  order: string;
-  pointId: string;
-  pointName: string;
-  address: string;
-  arrivalTime: string | null;
-  departureTime: string | null;
-  dwellMinutes: number;
-  workdayPercentage: number;
-}
-
-interface DrilldownOutput {
-  stops: DrilldownStop[];
-  totalDwellMinutes: number;
-  workdayPercentage: number;
-}
 
 interface PeriodHistoryContentProps {
   defaultPeriodType?: PeriodType;
@@ -60,13 +40,13 @@ export function PeriodHistoryContent({
     to: undefined as Date | undefined,
   });
 
-  const buildQueryParams = () => {
-    const params: Record<string, string> = { periodType };
+  const buildQueryParams = (): GetAggregationInput => {
+    const params: GetAggregationInput = { periodType };
     if (periodType === "day" && date) {
       params.date = date.toISOString();
     } else if (periodType === "month") {
-      params.year = month.year.toString();
-      params.month = month.month.toString();
+      params.year = month.year;
+      params.month = month.month;
     } else if (periodType === "custom" && dateRange.from && dateRange.to) {
       params.dateFrom = dateRange.from.toISOString();
       params.dateTo = dateRange.to.toISOString();
@@ -74,24 +54,13 @@ export function PeriodHistoryContent({
     return params;
   };
 
-  const { data: drilldown, isLoading: loadingDrilldown } = useQuery({
-    queryKey: ["dashboard", "drilldown", buildQueryParams()],
-    queryFn: async () => {
-      const params = new URLSearchParams(buildQueryParams());
-      const res = await fetch(`/api/trpc/dashboard.getDrilldown?${params}`);
-      if (!res.ok) throw new Error("Erro ao buscar histórico");
-      const json = await res.json();
-      return json.result.data as DrilldownOutput;
-    },
-    enabled: true,
-  });
+  const utils = api.useUtils();
+
+  const { data: drilldown, isLoading: loadingDrilldown } =
+    api.dashboard.getDrilldown.useQuery(buildQueryParams());
 
   const handleCsvExport = async () => {
-    const params = new URLSearchParams(buildQueryParams());
-    const res = await fetch(`/api/trpc/dashboard.exportCSV?${params}`);
-    if (!res.ok) throw new Error("Erro ao exportar CSV");
-    const json = await res.json();
-    return json.result.data;
+    return utils.dashboard.exportCSV.fetch(buildQueryParams());
   };
 
   const formatTime = (timeStr: string | null) => {
