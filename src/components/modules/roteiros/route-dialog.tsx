@@ -43,7 +43,7 @@ export function RouteDialog({
 
   // For new routes
   const [stops, setStops] = useState<{ pointId: string; order: string }[]>([
-    { pointId: "", order: "0" },
+    { pointId: "", order: "1" },
   ]);
 
   const { data: routeData, isLoading: isLoadingRoute } =
@@ -70,7 +70,7 @@ export function RouteDialog({
       setDriverId("");
       setDate(format(new Date(), "yyyy-MM-dd'T'HH:mm"));
       setVehicleId("");
-      setStops([{ pointId: "", order: "0" }]);
+      setStops([{ pointId: "", order: "1" }]);
     }
   }, [open, routeData, isEditing]);
 
@@ -139,7 +139,7 @@ export function RouteDialog({
         driverId,
         date: new Date(date).toISOString(),
         vehicleId: vehicleId || null,
-        stops: stops.map((s, i) => ({ pointId: s.pointId, order: String(i) })),
+        stops: stops.map((s, i) => ({ pointId: s.pointId, order: String(i + 1) })),
       });
     } else {
       updateRouteMutation.mutate({
@@ -151,7 +151,7 @@ export function RouteDialog({
   };
 
   const handleAddStopUI = () => {
-    setStops([...stops, { pointId: "", order: String(stops.length) }]);
+    setStops([...stops, { pointId: "", order: String(stops.length + 1) }]);
   };
 
   const handleRemoveStopUI = (index: number) => {
@@ -319,7 +319,7 @@ export function RouteDialog({
                         <div className="flex-1 px-3 py-2 border rounded-md text-sm truncate bg-muted/50 cursor-not-allowed">
                           {stop.point?.name} - {stop.point?.address}
                         </div>
-                        {!stop.arrivalAt && stop.order !== "0" && (
+                        {!stop.arrivalAt && stop.order !== "1" && (
                           <Button
                             type="button"
                             variant="ghost"
@@ -347,7 +347,7 @@ export function RouteDialog({
                         addStopMutation.mutate({
                           routeId: routeId ?? "",
                           pointId: val as string,
-                          order: String(routeData?.stops.length || 0),
+                          order: String((routeData?.stops.length || 0) + 1),
                         });
                       }}
                     >
