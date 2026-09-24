@@ -49,7 +49,7 @@ export function SelectField({
           {props?.items &&
             Array.isArray(props.items) &&
             props.items.map(({ value, label }) => (
-              <SelectItem value={value} key={value}>
+              <SelectItem value={value} key={value} label={label}>
                 {label}
               </SelectItem>
             ))}

@@ -40,6 +40,7 @@ export function RouteDialog({
   const [driverId, setDriverId] = useState("");
   const [date, setDate] = useState("");
   const [vehicleId, setVehicleId] = useState("");
+  const [newStopPointId, setNewStopPointId] = useState("");
 
   // For new routes
   const [stops, setStops] = useState<{ pointId: string; order: string }[]>([
@@ -100,6 +101,8 @@ export function RouteDialog({
     onSuccess: () => {
       toast.success("Parada adicionada!");
       utils.routes.get.invalidate({ id: routeId ?? "" });
+      utils.routes.list.invalidate();
+      setNewStopPointId("");
     },
     onError: (error: { message: string }) => {
       toast.error(`Erro ao adicionar parada: ${error.message}`);
@@ -110,6 +113,7 @@ export function RouteDialog({
     onSuccess: () => {
       toast.success("Parada removida!");
       utils.routes.get.invalidate({ id: routeId ?? "" });
+      utils.routes.list.invalidate();
     },
     onError: (error: { message: string }) => {
       toast.error(`Erro ao remover parada: ${error.message}`);
@@ -191,7 +195,7 @@ export function RouteDialog({
                     <SelectContent>
                       {drivers?.drivers.map(
                         (d: { id: string; name: string }) => (
-                          <SelectItem key={d.id} value={d.id}>
+                          <SelectItem key={d.id} value={d.id} label={d.name}>
                             {d.name}
                           </SelectItem>
                         ),
@@ -226,10 +230,10 @@ export function RouteDialog({
                     <SelectValue placeholder="Selecione um veículo..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Nenhum (Indeterminado)</SelectItem>
+                    <SelectItem value="" label="Nenhum (Indeterminado)">Nenhum (Indeterminado)</SelectItem>
                     {vehicles?.map(
                       (v: { id: string; plate: string; model: string }) => (
-                        <SelectItem key={v.id} value={v.id}>
+                        <SelectItem key={v.id} value={v.id} label={`${v.plate} - ${v.model}`}>
                           {v.plate} - {v.model}
                         </SelectItem>
                       ),
@@ -279,7 +283,7 @@ export function RouteDialog({
                               name: string;
                               address: string;
                             }) => (
-                              <SelectItem key={p.id} value={p.id}>
+                              <SelectItem key={p.id} value={p.id} label={`${p.name} - ${p.address}`}>
                                 {p.name} - {p.address}
                               </SelectItem>
                             ),
@@ -343,12 +347,17 @@ export function RouteDialog({
 
                   <div className="pt-2 border-t mt-4 flex gap-2">
                     <Select
+                      value={newStopPointId}
                       onValueChange={(val) => {
-                        addStopMutation.mutate({
-                          routeId: routeId ?? "",
-                          pointId: val as string,
-                          order: String((routeData?.stops.length || 0) + 1),
-                        });
+                        const pointId = val || "";
+                        setNewStopPointId(pointId);
+                        if (pointId) {
+                          addStopMutation.mutate({
+                            routeId: routeId ?? "",
+                            pointId,
+                            order: String((routeData?.stops.length || 0) + 1),
+                          });
+                        }
                       }}
                     >
                       <SelectTrigger className="flex-1">
@@ -357,7 +366,7 @@ export function RouteDialog({
                       <SelectContent>
                         {points?.points.map(
                           (p: { id: string; name: string }) => (
-                            <SelectItem key={p.id} value={p.id}>
+                            <SelectItem key={p.id} value={p.id} label={p.name}>
                               {p.name}
                             </SelectItem>
                           ),

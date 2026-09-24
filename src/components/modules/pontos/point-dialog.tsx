@@ -93,14 +93,14 @@ export function PointDialog({
     let lngNum: number | undefined;
 
     if (latitude.trim()) {
-      latNum = parseFloat(latitude);
+      latNum = parseFloat(latitude.replace(',', '.'));
       if (Number.isNaN(latNum) || latNum < -90 || latNum > 90) {
         newErrors.latitude = "Latitude inválida (-90 a 90)";
       }
     }
 
     if (longitude.trim()) {
-      lngNum = parseFloat(longitude);
+      lngNum = parseFloat(longitude.replace(',', '.'));
       if (Number.isNaN(lngNum) || lngNum < -180 || lngNum > 180) {
         newErrors.longitude = "Longitude inválida (-180 a 180)";
       }
