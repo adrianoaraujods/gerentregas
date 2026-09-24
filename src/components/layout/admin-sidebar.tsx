@@ -80,7 +80,11 @@ export default function AdminSidebar({ user }: { user: User }) {
               {mainNav.map((item) => (
                 <SidebarMenuItem key={item.label}>
                   <SidebarMenuButton
-                    isActive={item.href === pathname}
+                    isActive={
+                      item.href === "/admin"
+                        ? pathname === "/admin"
+                        : pathname.startsWith(item.href)
+                    }
                     tooltip={item.label}
                     render={<Link href={item.href} />}
                   >

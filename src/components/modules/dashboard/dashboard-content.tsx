@@ -115,28 +115,22 @@ export function DashboardContent() {
   }, [workdayData]);
 
   const handleDrilldown = async (periodKey: string) => {
-    const input = buildInput();
-    if (periodType === "day") {
-      input.date = periodKey;
-    } else if (periodType === "month") {
-      input.year = month.year;
-      input.month = month.month;
-    } else if (periodType === "custom") {
-      input.dateFrom = periodKey;
+    let drilldownInput: GetAggregationInput;
+
+    if (periodType === "month" || periodType === "custom") {
+      drilldownInput = { periodType: "day", date: new Date(periodKey).toISOString() };
+    } else {
+      drilldownInput = { periodType: "day", date: date.toISOString() };
     }
 
     try {
-      const data = await utils.dashboard.getDrilldown.fetch(input);
+      const data = await utils.dashboard.getDrilldown.fetch(drilldownInput);
 
       setDrilldownStops(data.stops);
       setDrilldownTotal(data.totalDwellMinutes);
       setDrilldownWorkdayPct(data.workdayPercentage);
       setDrilldownTitle(
-        periodType === "day"
-          ? `Detalhes do dia ${format(new Date(periodKey), "dd/MM/yyyy", { locale: ptBR })}`
-          : periodType === "month"
-            ? `Detalhes de ${format(new Date(`${month.year}-${String(month.month).padStart(2, "0")}-01`), "MMMM 'de' yyyy", { locale: ptBR })}`
-            : `Detalhes de ${format(new Date(periodKey), "dd/MM/yyyy", { locale: ptBR })}`,
+        `Detalhes do dia ${format(new Date(drilldownInput.date!), "dd/MM/yyyy", { locale: ptBR })}`
       );
       setDrilldownOpen(true);
     } catch (error) {

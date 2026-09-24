@@ -67,6 +67,8 @@ export class DashboardRepository {
         pointName: point.name,
         address: point.address,
         concludedAt: stop.concludedAt,
+        arrivalAt: stop.arrivalAt,
+        departureAt: stop.departureAt,
       })
       .from(stop)
       .leftJoin(point, eq(stop.pointId, point.id))
@@ -105,18 +107,17 @@ export class DashboardRepository {
         let dwellMinutes = 0;
 
         if (!isOrigin && i > 0) {
-          const prevStop = routeStops[i - 1];
-          if (prevStop.concludedAt && currentStop.concludedAt) {
-            arrivalTime = prevStop.concludedAt;
+          if (currentStop.arrivalAt && currentStop.departureAt) {
+            arrivalTime = currentStop.arrivalAt;
             const diffMs =
-              currentStop.concludedAt.getTime() -
-              prevStop.concludedAt.getTime();
+              currentStop.departureAt.getTime() -
+              currentStop.arrivalAt.getTime();
             dwellMinutes = Math.round(diffMs / 60000);
             totalDwellMinutes += dwellMinutes;
           }
         }
 
-        const departureTime = currentStop.concludedAt;
+        const departureTime = currentStop.departureAt;
         const startHour = arrivalTime
           ? arrivalTime.getHours() + arrivalTime.getMinutes() / 60
           : departureTime
@@ -159,23 +160,23 @@ export class DashboardRepository {
           ${stop.id} as stop_id,
           ${stop.routeId} as route_id,
           ${stop.order} as stop_order,
-          ${stop.concludedAt} as concluded_at,
-          LAG(${stop.concludedAt}) OVER (PARTITION BY ${route.id} ORDER BY ${stop.order}) as prev_concluded_at
+          ${stop.arrivalAt} as arrival_at,
+          ${stop.departureAt} as departure_at
         FROM ${route}
         LEFT JOIN ${stop} ON (${stop.routeId} = ${route.id} AND ${stop.deletedAt} IS NULL)
         WHERE ${route.date} >= ${startDate.toISOString()}
           AND ${route.date} <= ${endDate.toISOString()}
           AND ${route.deletedAt} IS NULL
           AND ${stop.order} != '1'
-          AND ${stop.concludedAt} IS NOT NULL
+          AND ${stop.departureAt} IS NOT NULL
+          AND ${stop.arrivalAt} IS NOT NULL
       ),
       daily_dwell AS (
         SELECT
           date,
-          SUM(EXTRACT(EPOCH FROM (concluded_at - prev_concluded_at)) / 60) as total_dwell_minutes,
+          SUM(EXTRACT(EPOCH FROM (departure_at - arrival_at)) / 60) as total_dwell_minutes,
           COUNT(*) as stops_count
         FROM stop_dwell
-        WHERE prev_concluded_at IS NOT NULL
         GROUP BY date
       )
       SELECT date, COALESCE(total_dwell_minutes, 0) as total_dwell_minutes, COALESCE(stops_count, 0) as stops_count
@@ -320,6 +321,8 @@ export class DashboardRepository {
         pointName: point.name,
         address: point.address,
         concludedAt: stop.concludedAt,
+        arrivalAt: stop.arrivalAt,
+        departureAt: stop.departureAt,
       })
       .from(stop)
       .leftJoin(point, eq(stop.pointId, point.id))
@@ -328,7 +331,7 @@ export class DashboardRepository {
           inArray(stop.routeId, routeIds),
           isNull(stop.deletedAt),
           sql`${stop.order} != '1'`,
-          sql`${stop.concludedAt} IS NOT NULL`,
+          sql`${stop.departureAt} IS NOT NULL`
         ),
       )
       .orderBy(stop.routeId, stop.order);
@@ -367,12 +370,11 @@ export class DashboardRepository {
         let dwellMinutes = 0;
 
         if (i > 0) {
-          const prevStop = routeStops[i - 1];
-          if (prevStop.concludedAt && currentStop.concludedAt) {
-            arrivalTime = prevStop.concludedAt;
+          if (currentStop.arrivalAt && currentStop.departureAt) {
+            arrivalTime = currentStop.arrivalAt;
             const diffMs =
-              currentStop.concludedAt.getTime() -
-              prevStop.concludedAt.getTime();
+              currentStop.departureAt.getTime() -
+              currentStop.arrivalAt.getTime();
             dwellMinutes = Math.round(diffMs / 60000);
             totalDwellMinutes += dwellMinutes;
           }
@@ -388,7 +390,7 @@ export class DashboardRepository {
           pointName: currentStop.pointName ?? "Ponto desconhecido",
           address: currentStop.address ?? "Endereço não informado",
           arrivalTime,
-          departureTime: currentStop.concludedAt,
+          departureTime: currentStop.departureAt,
           dwellMinutes,
         });
       }

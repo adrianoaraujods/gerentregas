@@ -176,7 +176,30 @@ export class RoutesService {
     if (!routeData) {
       throw new NotFoundError("Rota não encontrada.");
     }
-    return this.addPricing(routeData);
+    
+    const stopsWithDwell = routeData.stops.map((stop) => {
+      let dwellSeconds: number | undefined;
+      if (stop.arrivalAt && stop.departureAt && stop.order !== "1") {
+        dwellSeconds = Math.floor(
+          (new Date(stop.departureAt).getTime() -
+            new Date(stop.arrivalAt).getTime()) /
+            1000,
+        );
+      } else if (stop.order === "1") {
+        dwellSeconds = 0;
+      }
+      return { ...stop, dwellSeconds };
+    });
+
+    const totalDwellSeconds = stopsWithDwell
+      .filter((s) => s.order !== "1" && s.dwellSeconds !== undefined)
+      .reduce((sum, s) => sum + (s.dwellSeconds ?? 0), 0);
+
+    return this.addPricing({
+      ...routeData,
+      stops: stopsWithDwell,
+      totalDwellSeconds,
+    });
   }
 
   async getDriverRoute(
@@ -663,12 +686,14 @@ export class RoutesService {
 
     const stopsWithDwell = routeWithStops.stops.map((stop) => {
       let dwellSeconds: number | undefined;
-      if (stop.arrivalAt && stop.departureAt) {
+      if (stop.arrivalAt && stop.departureAt && stop.order !== "1") {
         dwellSeconds = Math.floor(
           (new Date(stop.departureAt).getTime() -
             new Date(stop.arrivalAt).getTime()) /
             1000,
         );
+      } else if (stop.order === "1") {
+        dwellSeconds = 0;
       }
       return { ...stop, dwellSeconds };
     });
