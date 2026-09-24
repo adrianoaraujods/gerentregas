@@ -44,7 +44,9 @@ export function PeriodSelector({
   const [monthPopoverOpen, setMonthPopoverOpen] = useState(false);
   const [rangePopoverOpen, setRangePopoverOpen] = useState(false);
   const [dayMonth, setDayMonth] = useState(date);
-  const [pickerMonth, setPickerMonth] = useState(new Date(month.year, month.month - 1));
+  const [pickerMonth, setPickerMonth] = useState(
+    new Date(month.year, month.month - 1),
+  );
   const [rangeMonth, setRangeMonth] = useState(dateRange.from || new Date());
 
   const handleDaySelect = (day: Date | undefined) => {

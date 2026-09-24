@@ -48,7 +48,9 @@ export function PointDialog({
         setName(pointToEdit.name);
         setAddress(pointToEdit.address);
         setLatitude(pointToEdit.latitude ? String(pointToEdit.latitude) : "");
-        setLongitude(pointToEdit.longitude ? String(pointToEdit.longitude) : "");
+        setLongitude(
+          pointToEdit.longitude ? String(pointToEdit.longitude) : "",
+        );
       } else {
         setName("");
         setAddress("");
@@ -86,17 +88,17 @@ export function PointDialog({
     const newErrors: { [key: string]: string } = {};
     if (!name.trim()) newErrors.name = "Nome é obrigatório";
     if (!address.trim()) newErrors.address = "Endereço é obrigatório";
-    
+
     let latNum: number | undefined;
     let lngNum: number | undefined;
-    
+
     if (latitude.trim()) {
       latNum = parseFloat(latitude);
       if (Number.isNaN(latNum) || latNum < -90 || latNum > 90) {
         newErrors.latitude = "Latitude inválida (-90 a 90)";
       }
     }
-    
+
     if (longitude.trim()) {
       lngNum = parseFloat(longitude);
       if (Number.isNaN(lngNum) || lngNum < -180 || lngNum > 180) {
@@ -165,10 +167,14 @@ export function PointDialog({
             </FieldContent>
           </Field>
 
-          {(pointToEdit?.geocodeStatus === "failed" || latitude || longitude) && (
+          {(pointToEdit?.geocodeStatus === "failed" ||
+            latitude ||
+            longitude) && (
             <div className="grid grid-cols-2 gap-4">
               <Field>
-                <FieldLabel htmlFor="point-latitude">Latitude (Opcional)</FieldLabel>
+                <FieldLabel htmlFor="point-latitude">
+                  Latitude (Opcional)
+                </FieldLabel>
                 <FieldContent>
                   <Input
                     id="point-latitude"
@@ -181,7 +187,9 @@ export function PointDialog({
               </Field>
 
               <Field>
-                <FieldLabel htmlFor="point-longitude">Longitude (Opcional)</FieldLabel>
+                <FieldLabel htmlFor="point-longitude">
+                  Longitude (Opcional)
+                </FieldLabel>
                 <FieldContent>
                   <Input
                     id="point-longitude"

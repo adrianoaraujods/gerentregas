@@ -1,7 +1,7 @@
 "use client";
 
 import { format } from "date-fns";
-import { MapIcon, Plus, Trash } from "lucide-react";
+import { History, MapIcon, Plus, Trash } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +19,7 @@ import {
 import { api } from "@/lib/api/client";
 
 import { RouteDialog } from "./route-dialog";
+import { RouteHistoryDialog } from "./route-history-dialog";
 
 function formatCurrency(value: number | null | undefined) {
   if (value == null) return "Indeterminado";
@@ -36,6 +37,9 @@ function formatDistance(value: number | null | undefined) {
 export function RoteirosContent() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [routeToEditId, setRouteToEditId] = useState<string | null>(null);
+
+  const [isHistoryDialogOpen, setIsHistoryDialogOpen] = useState(false);
+  const [routeHistoryId, setRouteHistoryId] = useState<string | null>(null);
 
   const { data: routesData, isLoading: isLoadingRoutes } =
     api.routes.list.useQuery({ limit: 100, offset: 0 });
@@ -190,6 +194,17 @@ export function RoteirosContent() {
                           variant="ghost"
                           size="icon"
                           onClick={() => {
+                            setRouteHistoryId(route.id);
+                            setIsHistoryDialogOpen(true);
+                          }}
+                          title="Histórico de versões"
+                        >
+                          <History className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
                             setRouteToEditId(route.id);
                             setIsDialogOpen(true);
                           }}
@@ -222,6 +237,12 @@ export function RoteirosContent() {
         onOpenChange={setIsDialogOpen}
         routeId={routeToEditId}
         onSuccess={() => utils.routes.list.invalidate()}
+      />
+
+      <RouteHistoryDialog
+        open={isHistoryDialogOpen}
+        onOpenChange={setIsHistoryDialogOpen}
+        routeId={routeHistoryId}
       />
     </div>
   );

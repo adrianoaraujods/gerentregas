@@ -60,7 +60,7 @@ export function DayTimelineChart({
     .map((stop, index) => {
       const minDuration = 0.25; // min 15 minutes for visibility
       const endHour = stop.startHour + Math.max(stop.dwellHours, minDuration);
-      
+
       return {
         ...stop,
         index,
