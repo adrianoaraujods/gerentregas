@@ -41,7 +41,7 @@ export class SyncRepository {
   ): Promise<boolean> {
     const [row] = await this.db
       .update(stop)
-      .set({ departureAt, concludedAt: departureAt, updatedAt: new Date() })
+      .set({ departureAt, updatedAt: new Date() })
       .where(and(eq(stop.id, stopId), isNull(stop.deletedAt)))
       .returning({ id: stop.id });
     return !!row;
@@ -70,7 +70,7 @@ export class SyncRepository {
       .where(
         and(
           eq(stop.routeId, routeId),
-          isNull(stop.concludedAt),
+          isNull(stop.departureAt),
           isNull(stop.deletedAt),
         ),
       );

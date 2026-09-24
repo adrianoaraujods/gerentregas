@@ -490,7 +490,7 @@ describe("RoutesService", () => {
       const stopId = route.stops[1].id;
       const result = await routesService.concludeStop(route.id, stopId);
 
-      expect(result.stops[1].concludedAt).not.toBeNull();
+      expect(result.stops[1].departureAt).not.toBeNull();
       expect(result.status).toBe("in_flight");
     });
 
@@ -555,7 +555,7 @@ describe("RoutesService", () => {
       await routesService.concludeStop(route.id, route.stops[0].id);
 
       const updatedRoute = await routesService.getRoute(route.id);
-      const lastConcluded = updatedRoute.stops.find((s) => s.concludedAt);
+      const lastConcluded = updatedRoute.stops.find((s) => s.departureAt);
       expect(lastConcluded?.order).toBe("1");
 
       const result = await routesService.updateStop(

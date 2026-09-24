@@ -129,7 +129,6 @@ describe("SyncService", () => {
           addressSnapshot: "Av. Paulista, 1000, São Paulo, SP",
           latitudeSnapshot: -23.5505,
           longitudeSnapshot: -46.6333,
-          concludedAt: null,
         },
         {
           routeId,
@@ -138,7 +137,6 @@ describe("SyncService", () => {
           addressSnapshot: "Rua Augusta, 500, São Paulo, SP",
           latitudeSnapshot: -23.5515,
           longitudeSnapshot: -46.6343,
-          concludedAt: null,
         },
         {
           routeId,
@@ -147,7 +145,6 @@ describe("SyncService", () => {
           addressSnapshot: "Rua Oscar Freire, 300, São Paulo, SP",
           latitudeSnapshot: -23.5525,
           longitudeSnapshot: -46.6353,
-          concludedAt: null,
         },
       ])
       .returning({ id: stop.id, order: stop.order });
@@ -193,7 +190,6 @@ describe("SyncService", () => {
         .select({
           arrivalAt: stop.arrivalAt,
           departureAt: stop.departureAt,
-          concludedAt: stop.concludedAt,
         })
         .from(stop)
         .where(eq(stop.id, stopsByOrder["1"]));
@@ -201,9 +197,6 @@ describe("SyncService", () => {
         new Date(routeDate.getTime() + 30 * 60000).toISOString(),
       );
       expect(stored.departureAt?.toISOString()).toBe(
-        new Date(routeDate.getTime() + 45 * 60000).toISOString(),
-      );
-      expect(stored.concludedAt?.toISOString()).toBe(
         new Date(routeDate.getTime() + 45 * 60000).toISOString(),
       );
     });
@@ -262,7 +255,7 @@ describe("SyncService", () => {
     it("rejects a duplicate arrival on an already-closed stop", async () => {
       await db
         .update(stop)
-        .set({ concludedAt: new Date(routeDate.getTime() + 45 * 60000) })
+        .set({ departureAt: new Date(routeDate.getTime() + 45 * 60000) })
         .where(eq(stop.id, stopsByOrder["1"]));
 
       const result = await service.uploadBatch(
@@ -298,7 +291,6 @@ describe("SyncService", () => {
           addressSnapshot: "Av. Paulista, 1000, São Paulo, SP",
           latitudeSnapshot: -23.5505,
           longitudeSnapshot: -46.6333,
-          concludedAt: null,
         })
         .returning({ id: stop.id });
 
@@ -374,7 +366,7 @@ describe("SyncService", () => {
 
       await db
         .update(stop)
-        .set({ concludedAt: new Date(routeDate.getTime() + 15 * 60000) })
+        .set({ departureAt: new Date(routeDate.getTime() + 15 * 60000) })
         .where(eq(stop.id, stopsByOrder["1"]));
 
       await service.uploadBatch(
@@ -415,7 +407,6 @@ describe("SyncService", () => {
           addressSnapshot: "Av. Paulista, 1000, São Paulo, SP",
           latitudeSnapshot: -23.5505,
           longitudeSnapshot: -46.6333,
-          concludedAt: null,
         })
         .returning({ id: stop.id });
 

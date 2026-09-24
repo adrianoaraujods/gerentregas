@@ -311,7 +311,6 @@ export async function main() {
         order: string;
         arrivalAt: Date | null;
         departureAt: Date | null;
-        concludedAt: Date | null;
       }> = [];
 
       let currentTime = new Date(routeDate);
@@ -320,27 +319,27 @@ export async function main() {
         const stopId = crypto.randomUUID();
         const order = String(j + 1);
         const pointItem = selectedPoints[j];
+        const isOrigin = order === "1";
 
         let arrivalAt: Date | null = null;
         let departureAt: Date | null = null;
-        let concludedAt: Date | null = null;
-        
         if (
           status === "concluded" ||
           (status === "in_flight" && j < numStops - 1)
         ) {
-          const travelTime = Math.floor(Math.random() * 20) + 10; // 10-30 min trânsito
-          currentTime = addMinutes(currentTime, travelTime);
-          arrivalAt = new Date(currentTime);
-          
-          const dwellTime = Math.floor(Math.random() * 15) + 5; // 5-20 min parado
-          currentTime = addMinutes(currentTime, dwellTime);
-          departureAt = new Date(currentTime);
-          concludedAt = new Date(currentTime);
-        } else if (status === "in_flight" && j === numStops - 1) {
-          // Última parada em andamento (chegou mas não saiu)
-          const travelTime = Math.floor(Math.random() * 20) + 10;
-          currentTime = addMinutes(currentTime, travelTime);
+          const travel = Math.floor(Math.random() * 31) + 15;
+          currentTime = addMinutes(currentTime, travel);
+          if (isOrigin) {
+            departureAt = new Date(currentTime);
+          } else {
+            arrivalAt = new Date(currentTime);
+            const dwell = Math.floor(Math.random() * 26) + 10;
+            currentTime = addMinutes(currentTime, dwell);
+            departureAt = new Date(currentTime);
+          }
+        } else if (status === "in_flight" && j === numStops - 1 && !isOrigin) {
+          const travel = Math.floor(Math.random() * 31) + 15;
+          currentTime = addMinutes(currentTime, travel);
           arrivalAt = new Date(currentTime);
         }
 
@@ -354,12 +353,11 @@ export async function main() {
           longitudeSnapshot: pointItem.longitude,
           arrivalAt,
           departureAt,
-          concludedAt,
           createdAt: routeDate,
           updatedAt: routeDate,
         });
 
-        stopsCreated.push({ id: stopId, order, arrivalAt, departureAt, concludedAt });
+        stopsCreated.push({ id: stopId, order, arrivalAt, departureAt });
       }
 
       await db.insert(routeVersion).values({
@@ -397,7 +395,6 @@ export async function main() {
             longitudeSnapshot: pointItem.longitude,
             arrivalAt: stopItem.arrivalAt,
             departureAt: stopItem.departureAt,
-            concludedAt: stopItem.concludedAt,
             createdAt: routeDate,
           });
         }

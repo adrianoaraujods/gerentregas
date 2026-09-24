@@ -137,7 +137,7 @@ describe("DashboardService", () => {
         addressSnapshot: "Av. Paulista, 1000, São Paulo, SP",
         latitudeSnapshot: -23.5505,
         longitudeSnapshot: -46.6333,
-        concludedAt: new Date(baseTime.getTime() + 30 * 60000),
+        departureAt: new Date(baseTime.getTime() + 15 * 60000),
       },
       {
         routeId,
@@ -146,7 +146,8 @@ describe("DashboardService", () => {
         addressSnapshot: "Rua Augusta, 500, São Paulo, SP",
         latitudeSnapshot: -23.5515,
         longitudeSnapshot: -46.6343,
-        concludedAt: new Date(baseTime.getTime() + 90 * 60000),
+        arrivalAt: new Date(baseTime.getTime() + 30 * 60000),
+        departureAt: new Date(baseTime.getTime() + 90 * 60000),
       },
       {
         routeId,
@@ -155,7 +156,8 @@ describe("DashboardService", () => {
         addressSnapshot: "Rua Oscar Freire, 300, São Paulo, SP",
         latitudeSnapshot: -23.5525,
         longitudeSnapshot: -46.6353,
-        concludedAt: new Date(baseTime.getTime() + 150 * 60000),
+        arrivalAt: new Date(baseTime.getTime() + 120 * 60000),
+        departureAt: new Date(baseTime.getTime() + 180 * 60000),
       },
     ]);
   });
@@ -183,10 +185,10 @@ describe("DashboardService", () => {
       expect(result.stops).toHaveLength(3);
       expect(result.stops[0].order).toBe("1");
       expect(result.stops[0].dwellMinutes).toBe(0);
-      expect(result.stops[1].dwellMinutes).toBeGreaterThan(0);
-      expect(result.stops[2].dwellMinutes).toBeGreaterThan(0);
-      expect(result.totalDwellMinutes).toBeGreaterThan(0);
-      expect(result.workdayPercentage).toBeGreaterThan(0);
+      expect(result.stops[1].dwellMinutes).toBe(60);
+      expect(result.stops[2].dwellMinutes).toBe(60);
+      expect(result.totalDwellMinutes).toBe(120);
+      expect(result.workdayPercentage).toBe(25);
     });
 
     it("returns empty data for day with no routes", async () => {
@@ -226,8 +228,8 @@ describe("DashboardService", () => {
       expect(result.year).toBe(year);
       expect(result.month).toBe(month);
       expect(result.days).toBeDefined();
-      expect(result.totalDwellMinutes).toBeGreaterThanOrEqual(0);
-      expect(result.workdayPercentage).toBeGreaterThanOrEqual(0);
+      expect(result.totalDwellMinutes).toBe(120);
+      expect(result.workdayPercentage).toBe(25);
     });
   });
 
@@ -250,8 +252,8 @@ describe("DashboardService", () => {
       if (!isCustomAggregation(result)) return;
 
       expect(result.days).toBeDefined();
-      expect(result.totalDwellMinutes).toBeGreaterThanOrEqual(0);
-      expect(result.workdayPercentage).toBeGreaterThanOrEqual(0);
+      expect(result.totalDwellMinutes).toBe(120);
+      expect(result.workdayPercentage).toBe(25);
     });
   });
 
@@ -265,7 +267,7 @@ describe("DashboardService", () => {
         date: testDate.toISOString(),
       });
 
-      expect(result.stops.length).toBeGreaterThan(0);
+      expect(result.stops.length).toBe(2);
       expect(result.stops[0]).toHaveProperty("routeId");
       expect(result.stops[0]).toHaveProperty("driverName");
       expect(result.stops[0]).toHaveProperty("pointName");
@@ -274,7 +276,9 @@ describe("DashboardService", () => {
       expect(result.stops[0]).toHaveProperty("departureTime");
       expect(result.stops[0]).toHaveProperty("dwellMinutes");
       expect(result.stops[0]).toHaveProperty("workdayPercentage");
-      expect(result.totalDwellMinutes).toBeGreaterThan(0);
+      expect(result.stops[0].dwellMinutes).toBe(60);
+      expect(result.stops[1].dwellMinutes).toBe(60);
+      expect(result.totalDwellMinutes).toBe(120);
     });
   });
 
@@ -292,6 +296,7 @@ describe("DashboardService", () => {
         "Data,Motorista,Ordem da Parada,Ponto,Endereço,Chegada,Saída,Tempo Parado (min),% Jornada Padrão",
       );
       expect(result.csv).toContain("Entrega 1");
+      expect(result.csv).toContain(",60,12.50");
       expect(result.filename).toMatch(
         /dashboard-export-day-\d{4}-\d{2}-\d{2}\.csv/,
       );
@@ -406,7 +411,7 @@ describe("DashboardRepository", () => {
         addressSnapshot: "Av. Paulista, 1000, São Paulo, SP",
         latitudeSnapshot: -23.5505,
         longitudeSnapshot: -46.6333,
-        concludedAt: new Date(baseTime.getTime() + 30 * 60000),
+        departureAt: new Date(baseTime.getTime() + 15 * 60000),
       },
       {
         routeId,
@@ -415,7 +420,8 @@ describe("DashboardRepository", () => {
         addressSnapshot: "Rua Augusta, 500, São Paulo, SP",
         latitudeSnapshot: -23.5515,
         longitudeSnapshot: -46.6343,
-        concludedAt: new Date(baseTime.getTime() + 90 * 60000),
+        arrivalAt: new Date(baseTime.getTime() + 30 * 60000),
+        departureAt: new Date(baseTime.getTime() + 90 * 60000),
       },
       {
         routeId,
@@ -424,12 +430,13 @@ describe("DashboardRepository", () => {
         addressSnapshot: "Rua Oscar Freire, 300, São Paulo, SP",
         latitudeSnapshot: -23.5525,
         longitudeSnapshot: -46.6353,
-        concludedAt: new Date(baseTime.getTime() + 150 * 60000),
+        arrivalAt: new Date(baseTime.getTime() + 120 * 60000),
+        departureAt: new Date(baseTime.getTime() + 180 * 60000),
       },
     ]);
   });
 
-  it("calculates dwell time correctly between consecutive stops", async () => {
+  it("calculates dwell time per stop (RN02) and excludes the origin (RN03)", async () => {
     const queryDate = new Date(testDate);
     queryDate.setHours(0, 0, 0, 0);
     const result = await dashboardRepository.getDayTimeline(queryDate);
@@ -440,17 +447,5 @@ describe("DashboardRepository", () => {
     expect(result.stops[1].dwellMinutes).toBe(60);
     expect(result.stops[2].dwellMinutes).toBe(60);
     expect(result.totalDwellMinutes).toBe(120);
-  });
-
-  it("calculates workday percentage correctly", async () => {
-    const queryDate = new Date(testDate);
-    queryDate.setHours(0, 0, 0, 0);
-    const result = await dashboardRepository.getDayTimeline(queryDate);
-    const workdayMinutes =
-      await dashboardRepository.getStandardWorkdayDuration();
-
-    const expectedPercentage =
-      (result.totalDwellMinutes / workdayMinutes) * 100;
-    expect(expectedPercentage).toBeCloseTo(25, 1);
   });
 });

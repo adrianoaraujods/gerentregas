@@ -133,7 +133,7 @@ export class SyncService {
       return { ok: false, reason: "TIMESTAMP_OFF_ROUTE_DATE" };
     }
 
-    if (state.stop.concludedAt) {
+    if (state.stop.departureAt) {
       return { ok: false, reason: "DUPLICATE_ARRIVAL_ON_CLOSED_STOP" };
     }
 

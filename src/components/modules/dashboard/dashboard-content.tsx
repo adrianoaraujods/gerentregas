@@ -118,7 +118,10 @@ export function DashboardContent() {
     let drilldownInput: GetAggregationInput;
 
     if (periodType === "month" || periodType === "custom") {
-      drilldownInput = { periodType: "day", date: new Date(periodKey).toISOString() };
+      drilldownInput = {
+        periodType: "day",
+        date: new Date(periodKey).toISOString(),
+      };
     } else {
       drilldownInput = { periodType: "day", date: date.toISOString() };
     }
@@ -130,7 +133,11 @@ export function DashboardContent() {
       setDrilldownTotal(data.totalDwellMinutes);
       setDrilldownWorkdayPct(data.workdayPercentage);
       setDrilldownTitle(
-        `Detalhes do dia ${format(new Date(drilldownInput.date!), "dd/MM/yyyy", { locale: ptBR })}`
+        `Detalhes do dia ${format(
+          new Date(drilldownInput.date ?? new Date().toISOString()),
+          "dd/MM/yyyy",
+          { locale: ptBR },
+        )}`,
       );
       setDrilldownOpen(true);
     } catch (error) {

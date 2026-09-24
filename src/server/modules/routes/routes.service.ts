@@ -158,7 +158,6 @@ export class RoutesService {
         addressSnapshot: createdStop.addressSnapshot,
         latitudeSnapshot: createdStop.latitudeSnapshot,
         longitudeSnapshot: createdStop.longitudeSnapshot,
-        concludedAt: createdStop.concludedAt,
         arrivalAt: createdStop.arrivalAt ?? null,
         departureAt: createdStop.departureAt ?? null,
       });
@@ -176,7 +175,7 @@ export class RoutesService {
     if (!routeData) {
       throw new NotFoundError("Rota não encontrada.");
     }
-    
+
     const stopsWithDwell = routeData.stops.map((stop) => {
       let dwellSeconds: number | undefined;
       if (stop.arrivalAt && stop.departureAt && stop.order !== "1") {
@@ -185,8 +184,6 @@ export class RoutesService {
             new Date(stop.arrivalAt).getTime()) /
             1000,
         );
-      } else if (stop.order === "1") {
-        dwellSeconds = 0;
       }
       return { ...stop, dwellSeconds };
     });
@@ -410,7 +407,7 @@ export class RoutesService {
       throw new NotFoundError("Parada não encontrada.");
     }
 
-    if (existingStop.concludedAt) {
+    if (existingStop.departureAt) {
       throw new BadRequestError(
         "Não é possível alterar uma parada já concluída.",
       );
@@ -492,7 +489,7 @@ export class RoutesService {
       throw new NotFoundError("Parada não encontrada.");
     }
 
-    if (existingStop.concludedAt) {
+    if (existingStop.departureAt) {
       throw new BadRequestError("Parada já foi concluída.");
     }
 
@@ -500,10 +497,10 @@ export class RoutesService {
       await this.repository.updateRoute(routeId, { status: "in_flight" });
     }
 
-    await this.repository.updateStop(stopId, { concludedAt: new Date() });
+    await this.repository.updateStopDeparture(stopId, new Date());
 
     const allStops = await this.repository.listStopsByRoute(routeId);
-    const allConcluded = allStops.every((s) => s.concludedAt);
+    const allConcluded = allStops.every((s) => s.departureAt);
     if (allConcluded) {
       await this.repository.updateRoute(routeId, { status: "concluded" });
     }
@@ -530,7 +527,7 @@ export class RoutesService {
       throw new NotFoundError("Parada não encontrada.");
     }
 
-    if (existingStop.concludedAt) {
+    if (existingStop.departureAt) {
       throw new BadRequestError(
         "Não é possível excluir uma parada já concluída.",
       );
@@ -692,8 +689,6 @@ export class RoutesService {
             new Date(stop.arrivalAt).getTime()) /
             1000,
         );
-      } else if (stop.order === "1") {
-        dwellSeconds = 0;
       }
       return { ...stop, dwellSeconds };
     });
@@ -968,7 +963,6 @@ export class RoutesService {
         addressSnapshot: stopItem.addressSnapshot,
         latitudeSnapshot: stopItem.latitudeSnapshot,
         longitudeSnapshot: stopItem.longitudeSnapshot,
-        concludedAt: stopItem.concludedAt,
         arrivalAt: stopItem.arrivalAt,
         departureAt: stopItem.departureAt,
       });
@@ -1034,7 +1028,6 @@ export class RoutesService {
           addressSnapshot: currentStop.addressSnapshot,
           latitudeSnapshot: currentStop.latitudeSnapshot,
           longitudeSnapshot: currentStop.longitudeSnapshot,
-          concludedAt: currentStop.concludedAt,
           arrivalAt: currentStop.arrivalAt,
           departureAt: currentStop.departureAt,
           versionType: "correction",

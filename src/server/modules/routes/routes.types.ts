@@ -103,7 +103,6 @@ export const stopOutputSchema = stopSchema.pick({
   addressSnapshot: true,
   latitudeSnapshot: true,
   longitudeSnapshot: true,
-  concludedAt: true,
   arrivalAt: true,
   departureAt: true,
   createdAt: true,

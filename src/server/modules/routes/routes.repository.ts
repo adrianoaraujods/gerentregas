@@ -85,7 +85,6 @@ export class RoutesRepository {
     addressSnapshot: string;
     latitudeSnapshot: number | null;
     longitudeSnapshot: number | null;
-    concludedAt: Date | null;
     arrivalAt: Date | null;
     departureAt: Date | null;
     versionType?: "structural" | "correction";
@@ -267,7 +266,7 @@ export class RoutesRepository {
         and(
           eq(stop.routeId, routeId),
           isNull(stop.deletedAt),
-          sql`${stop.concludedAt} IS NOT NULL`,
+          sql`${stop.departureAt} IS NOT NULL`,
         ),
       )
       .orderBy(desc(stop.order))
@@ -320,13 +319,11 @@ export class RoutesRepository {
 
   async updateStop(
     id: string,
-    input: Partial<Pick<Stop, "pointId" | "order" | "concludedAt">>,
+    input: Partial<Pick<Stop, "pointId" | "order">>,
   ): Promise<Stop | null> {
     const updates: Record<string, unknown> = {};
     if (input.pointId !== undefined) updates.pointId = input.pointId;
     if (input.order !== undefined) updates.order = input.order;
-    if (input.concludedAt !== undefined)
-      updates.concludedAt = input.concludedAt;
     if (Object.keys(updates).length === 0) return null;
 
     updates.updatedAt = new Date();

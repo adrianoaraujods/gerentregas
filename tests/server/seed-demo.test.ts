@@ -56,12 +56,12 @@ describe("Demo seed script", () => {
         ?.count ?? 0,
     );
 
-    const stopsWithConcludedAt = Number(
+    const stopsWithDepartureAt = Number(
       (
         await db
           .select({ count: sql<number>`count(*)` })
           .from(stop)
-          .where(sql`${stop.concludedAt} IS NOT NULL`)
+          .where(sql`${stop.departureAt} IS NOT NULL`)
       )[0]?.count ?? 0,
     );
 
@@ -84,7 +84,7 @@ describe("Demo seed script", () => {
     expect(pointCount).toBe(18);
     expect(routeCount).toBeGreaterThan(50);
     expect(stopCount).toBeGreaterThan(200);
-    expect(stopsWithConcludedAt).toBeGreaterThan(100);
+    expect(stopsWithDepartureAt).toBeGreaterThan(100);
     expect(statusMap.concluded).toBeGreaterThan(50);
     expect(statusMap.in_flight).toBeGreaterThan(5);
     expect(statusMap.draft).toBeGreaterThan(5);
