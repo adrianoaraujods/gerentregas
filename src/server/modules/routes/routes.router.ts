@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   adminProcedure,
+  authenticatedProcedure,
   createRouter,
   driverProcedure,
   managerProcedure,
@@ -10,12 +11,16 @@ import type { Database } from "@/server/db";
 import { RoutesController } from "./routes.controller";
 import {
   addStopInputSchema,
+  checkInInputSchema,
+  checkOutInputSchema,
+  correctTimestampsInputSchema,
   createRouteInputSchema,
   driverRouteOutputSchema,
   listRoutesInputSchema,
   routeHistoryOutputSchema,
   routesListOutputSchema,
   routeWithStopsOutputSchema,
+  startShiftInputSchema,
   updateRouteInputSchema,
   updateStopInputSchema,
 } from "./routes.types";
@@ -132,4 +137,65 @@ export const routesRouter = createRouter({
         .getRouteHistory(input.id)
         .then(routeHistoryOutputSchema.parse),
     ),
+
+  getMyRouteWithDwell: driverProcedure
+    .input(
+      z.object({
+        date: z.iso.datetime({ local: true }).optional(),
+      }),
+    )
+    .query(({ ctx: { db, session }, input }) => {
+      const date = input.date ? new Date(input.date) : new Date();
+      return createController(db)
+        .getDriverRouteWithDwell(session.user.id, date)
+        .then((result) =>
+          result ? driverRouteOutputSchema.parse(result) : null,
+        );
+    }),
+
+  startShift: driverProcedure
+    .input(
+      z.object({ routeId: z.string().uuid() }).merge(startShiftInputSchema),
+    )
+    .mutation(({ ctx: { db, session }, input }) => {
+      const { routeId, ...data } = input;
+      return createController(db)
+        .startShift(routeId, data, session.user.id)
+        .then(routeWithStopsOutputSchema.parse);
+    }),
+
+  checkIn: driverProcedure
+    .input(checkInInputSchema)
+    .mutation(({ ctx: { db, session }, input }) =>
+      createController(db).checkIn(input.stopId, session.user.id),
+    ),
+
+  checkOut: driverProcedure
+    .input(checkOutInputSchema)
+    .mutation(({ ctx: { db, session }, input }) =>
+      createController(db).checkOut(input.stopId, session.user.id),
+    ),
+
+  correctTimestamps: authenticatedProcedure
+    .input(
+      z
+        .object({
+          routeId: z.string().uuid(),
+          stopId: z.string().uuid(),
+        })
+        .merge(correctTimestampsInputSchema),
+    )
+    .mutation(({ ctx: { db, session }, input }) => {
+      const { routeId, stopId, ...data } = input;
+      const isManager = ["manager", "admin"].includes(
+        session.user.role as string,
+      );
+      return createController(db).correctTimestamps(
+        routeId,
+        stopId,
+        data,
+        session.user.id,
+        isManager,
+      );
+    }),
 });

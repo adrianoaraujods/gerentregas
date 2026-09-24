@@ -113,7 +113,7 @@ describe("SyncService", () => {
         driverId,
         vehicleId: null,
         date: routeDate,
-        status: "draft",
+        status: "in_flight",
         currentVersion: "1",
       })
       .returning({ id: route.id });
@@ -129,7 +129,6 @@ describe("SyncService", () => {
           addressSnapshot: "Av. Paulista, 1000, São Paulo, SP",
           latitudeSnapshot: -23.5505,
           longitudeSnapshot: -46.6333,
-          concludedAt: null,
         },
         {
           routeId,
@@ -138,7 +137,6 @@ describe("SyncService", () => {
           addressSnapshot: "Rua Augusta, 500, São Paulo, SP",
           latitudeSnapshot: -23.5515,
           longitudeSnapshot: -46.6343,
-          concludedAt: null,
         },
         {
           routeId,
@@ -147,7 +145,6 @@ describe("SyncService", () => {
           addressSnapshot: "Rua Oscar Freire, 300, São Paulo, SP",
           latitudeSnapshot: -23.5525,
           longitudeSnapshot: -46.6353,
-          concludedAt: null,
         },
       ])
       .returning({ id: stop.id, order: stop.order });
@@ -176,7 +173,7 @@ describe("SyncService", () => {
   }
 
   describe("uploadBatch", () => {
-    it("accepts a valid item and persists its departure timestamp", async () => {
+    it("accepts a valid item and persists its arrival and departure timestamps", async () => {
       const input = item({
         stopId: stopsByOrder["1"],
         arrival: new Date(routeDate.getTime() + 30 * 60000),
@@ -190,10 +187,16 @@ describe("SyncService", () => {
       expect(result.summary).toEqual({ total: 1, accepted: 1, rejected: 0 });
 
       const [stored] = await db
-        .select({ concludedAt: stop.concludedAt })
+        .select({
+          arrivalAt: stop.arrivalAt,
+          departureAt: stop.departureAt,
+        })
         .from(stop)
         .where(eq(stop.id, stopsByOrder["1"]));
-      expect(stored.concludedAt?.toISOString()).toBe(
+      expect(stored.arrivalAt?.toISOString()).toBe(
+        new Date(routeDate.getTime() + 30 * 60000).toISOString(),
+      );
+      expect(stored.departureAt?.toISOString()).toBe(
         new Date(routeDate.getTime() + 45 * 60000).toISOString(),
       );
     });
@@ -213,7 +216,7 @@ describe("SyncService", () => {
       );
 
       expect(result.rejected).toHaveLength(1);
-      expect(result.rejected[0].reason).toBe("departure_before_arrival");
+      expect(result.rejected[0].reason).toBe("DEPARTURE_BEFORE_ARRIVAL");
       expect(result.accepted).toHaveLength(0);
     });
 
@@ -225,7 +228,7 @@ describe("SyncService", () => {
       );
 
       expect(result.rejected).toHaveLength(1);
-      expect(result.rejected[0].reason).toBe("future_timestamp");
+      expect(result.rejected[0].reason).toBe("FUTURE_TIMESTAMP");
     });
 
     it("rejects a timestamp off the route's date", async () => {
@@ -246,13 +249,13 @@ describe("SyncService", () => {
       );
 
       expect(result.rejected).toHaveLength(1);
-      expect(result.rejected[0].reason).toBe("off_route_date");
+      expect(result.rejected[0].reason).toBe("TIMESTAMP_OFF_ROUTE_DATE");
     });
 
     it("rejects a duplicate arrival on an already-closed stop", async () => {
       await db
         .update(stop)
-        .set({ concludedAt: new Date(routeDate.getTime() + 45 * 60000) })
+        .set({ departureAt: new Date(routeDate.getTime() + 45 * 60000) })
         .where(eq(stop.id, stopsByOrder["1"]));
 
       const result = await service.uploadBatch(
@@ -261,7 +264,9 @@ describe("SyncService", () => {
       );
 
       expect(result.rejected).toHaveLength(1);
-      expect(result.rejected[0].reason).toBe("stop_already_closed");
+      expect(result.rejected[0].reason).toBe(
+        "DUPLICATE_ARRIVAL_ON_CLOSED_STOP",
+      );
     });
 
     it("rejects a stop that does not belong to the authenticated driver's route", async () => {
@@ -286,7 +291,6 @@ describe("SyncService", () => {
           addressSnapshot: "Av. Paulista, 1000, São Paulo, SP",
           latitudeSnapshot: -23.5505,
           longitudeSnapshot: -46.6333,
-          concludedAt: null,
         })
         .returning({ id: stop.id });
 
@@ -296,17 +300,17 @@ describe("SyncService", () => {
       );
 
       expect(result.rejected).toHaveLength(1);
-      expect(result.rejected[0].reason).toBe("stop_not_in_route");
+      expect(result.rejected[0].reason).toBe("STOP_NOT_IN_DRIVER_ROUTE");
     });
 
-    it("rejects an unknown stop as not belonging to the route", async () => {
+    it("rejects an unknown stop as not found", async () => {
       const result = await service.uploadBatch(
         { items: [item({ stopId: crypto.randomUUID() })] },
         driverId,
       );
 
       expect(result.rejected).toHaveLength(1);
-      expect(result.rejected[0].reason).toBe("stop_not_in_route");
+      expect(result.rejected[0].reason).toBe("STOP_NOT_FOUND");
     });
 
     it("returns per-item results for a mixed batch without dropping rejections", async () => {
@@ -326,7 +330,7 @@ describe("SyncService", () => {
       expect(result.accepted[0].id).toBe(valid.id);
       expect(result.rejected).toHaveLength(1);
       expect(result.rejected[0].id).toBe(invalid.id);
-      expect(result.rejected[0].reason).toBe("departure_before_arrival");
+      expect(result.rejected[0].reason).toBe("DEPARTURE_BEFORE_ARRIVAL");
       expect(result.summary).toEqual({ total: 2, accepted: 1, rejected: 1 });
     });
 
@@ -343,12 +347,14 @@ describe("SyncService", () => {
       expect(result.accepted[0].id).toBe(first.id);
       expect(result.rejected).toHaveLength(1);
       expect(result.rejected[0].id).toBe(duplicate.id);
-      expect(result.rejected[0].reason).toBe("stop_already_closed");
+      expect(result.rejected[0].reason).toBe(
+        "DUPLICATE_ARRIVAL_ON_CLOSED_STOP",
+      );
     });
 
     it("sets the route to in_flight and then concluded as stops close", async () => {
       await service.uploadBatch(
-        { items: [item({ stopId: stopsByOrder["1"] })] },
+        { items: [item({ stopId: stopsByOrder["2"] })] },
         driverId,
       );
 
@@ -358,12 +364,14 @@ describe("SyncService", () => {
         .where(eq(route.id, routeId));
       expect(afterFirst.status).toBe("in_flight");
 
+      await db
+        .update(stop)
+        .set({ departureAt: new Date(routeDate.getTime() + 15 * 60000) })
+        .where(eq(stop.id, stopsByOrder["1"]));
+
       await service.uploadBatch(
         {
-          items: [
-            item({ stopId: stopsByOrder["2"] }),
-            item({ stopId: stopsByOrder["3"] }),
-          ],
+          items: [item({ stopId: stopsByOrder["3"] })],
         },
         driverId,
       );
@@ -373,6 +381,42 @@ describe("SyncService", () => {
         .from(route)
         .where(eq(route.id, routeId));
       expect(afterLast.status).toBe("concluded");
+    });
+
+    it("rejects when route is not in_flight", async () => {
+      const tomorrow = new Date(routeDate);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const draftRoute = await db
+        .insert(route)
+        .values({
+          managerId,
+          driverId,
+          vehicleId: null,
+          date: tomorrow,
+          status: "draft",
+          currentVersion: "1",
+        })
+        .returning({ id: route.id });
+
+      const draftStop = await db
+        .insert(stop)
+        .values({
+          routeId: draftRoute[0].id,
+          pointId: pointId1,
+          order: "1",
+          addressSnapshot: "Av. Paulista, 1000, São Paulo, SP",
+          latitudeSnapshot: -23.5505,
+          longitudeSnapshot: -46.6333,
+        })
+        .returning({ id: stop.id });
+
+      const result = await service.uploadBatch(
+        { items: [item({ stopId: draftStop[0].id })] },
+        driverId,
+      );
+
+      expect(result.rejected).toHaveLength(1);
+      expect(result.rejected[0].reason).toBe("ROUTE_NOT_IN_FLIGHT");
     });
   });
 });

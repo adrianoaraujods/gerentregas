@@ -27,11 +27,13 @@ export type StopVersion = z.infer<typeof stopVersionSchema>;
 
 export const stopWithPointSchema = stopSchema.extend({
   point: pointOutputSchema.nullable(),
+  dwellSeconds: z.number().int().nonnegative().optional(),
 });
 export type StopWithPoint = z.infer<typeof stopWithPointSchema>;
 
 export const routeWithStopsSchema = routeSchema.extend({
   stops: z.array(stopWithPointSchema),
+  totalDwellSeconds: z.number().int().nonnegative().optional(),
 });
 export type RouteWithStops = z.infer<typeof routeWithStopsSchema>;
 
@@ -85,6 +87,7 @@ export const routeVersionWithStopsOutputSchema =
     stops: z.array(
       stopVersionSchema.extend({
         point: pointOutputSchema.nullable(),
+        actorName: z.string().nullable().optional(),
       }),
     ),
   });
@@ -100,7 +103,8 @@ export const stopOutputSchema = stopSchema.pick({
   addressSnapshot: true,
   latitudeSnapshot: true,
   longitudeSnapshot: true,
-  concludedAt: true,
+  arrivalAt: true,
+  departureAt: true,
   createdAt: true,
   updatedAt: true,
 });
@@ -108,11 +112,13 @@ export type StopOutput = z.infer<typeof stopOutputSchema>;
 
 export const stopWithPointOutputSchema = stopOutputSchema.extend({
   point: pointOutputSchema.nullable(),
+  dwellSeconds: z.number().int().nonnegative().optional(),
 });
 export type StopWithPointOutput = z.infer<typeof stopWithPointOutputSchema>;
 
 export const routeWithStopsOutputSchema = routeOutputSchema.extend({
   stops: z.array(stopWithPointOutputSchema),
+  totalDwellSeconds: z.number().int().nonnegative().optional(),
 });
 export type RouteWithStopsOutput = z.infer<typeof routeWithStopsOutputSchema>;
 
@@ -189,3 +195,34 @@ export const routeHistoryOutputSchema = z.object({
   versions: z.array(routeVersionWithStopsOutputSchema),
 });
 export type RouteHistoryOutput = z.infer<typeof routeHistoryOutputSchema>;
+
+export const startShiftInputSchema = z.object({
+  vehicleId: z.string().uuid("ID do veículo inválido").optional().nullable(),
+});
+export type StartShiftInput = z.infer<typeof startShiftInputSchema>;
+
+export const checkInInputSchema = z.object({
+  stopId: z.string().uuid("ID da parada inválido"),
+});
+export type CheckInInput = z.infer<typeof checkInInputSchema>;
+
+export const checkOutInputSchema = z.object({
+  stopId: z.string().uuid("ID da parada inválido"),
+});
+export type CheckOutInput = z.infer<typeof checkOutInputSchema>;
+
+export const correctTimestampsInputSchema = z.object({
+  arrivalAt: z
+    .union([z.string().datetime({ offset: true }), z.date()])
+    .optional()
+    .nullable()
+    .transform((val) => (val ? new Date(val) : null)),
+  departureAt: z
+    .union([z.string().datetime({ offset: true }), z.date()])
+    .optional()
+    .nullable()
+    .transform((val) => (val ? new Date(val) : null)),
+});
+export type CorrectTimestampsInput = z.infer<
+  typeof correctTimestampsInputSchema
+>;

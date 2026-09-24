@@ -19,6 +19,11 @@ export const routeStatusEnum = pgEnum("route_status", [
   "cancelled",
 ]);
 
+export const stopVersionTypeEnum = pgEnum("stop_version_type", [
+  "structural",
+  "correction",
+]);
+
 export const route = pgTable(
   "route",
   {
@@ -96,7 +101,8 @@ export const stop = pgTable(
     addressSnapshot: text("address_snapshot").notNull(),
     latitudeSnapshot: real("latitude_snapshot"),
     longitudeSnapshot: real("longitude_snapshot"),
-    concludedAt: timestamp("concluded_at"),
+    arrivalAt: timestamp("arrival_at"),
+    departureAt: timestamp("departure_at"),
     deletedAt: timestamp("deleted_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
@@ -131,8 +137,13 @@ export const stopVersion = pgTable(
     addressSnapshot: text("address_snapshot").notNull(),
     latitudeSnapshot: real("latitude_snapshot"),
     longitudeSnapshot: real("longitude_snapshot"),
-    concludedAt: timestamp("concluded_at"),
+    arrivalAt: timestamp("arrival_at"),
+    departureAt: timestamp("departure_at"),
     deletedAt: timestamp("deleted_at"),
+    versionType: stopVersionTypeEnum("version_type")
+      .notNull()
+      .default("structural"),
+    actorId: text("actor_id").references(() => user.id),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [

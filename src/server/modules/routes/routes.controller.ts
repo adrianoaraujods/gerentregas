@@ -6,22 +6,30 @@ import { RoutesRepository } from "./routes.repository";
 import { RoutesService } from "./routes.service";
 import type {
   AddStopInput,
+  CorrectTimestampsInput,
   CreateRouteInput,
   DriverRouteOutput,
   ListRoutesInput,
   RouteHistoryOutput,
   RoutesListOutput,
   RouteWithStopsOutput,
+  StartShiftInput,
+  Stop,
   UpdateRouteInput,
   UpdateStopInput,
 } from "./routes.types";
 import {
   addStopInputSchema,
+  checkInInputSchema,
+  checkOutInputSchema,
+  correctTimestampsInputSchema,
   createRouteInputSchema,
   driverRouteOutputSchema,
   routeHistoryOutputSchema,
   routesListOutputSchema,
   routeWithStopsOutputSchema,
+  startShiftInputSchema,
+  stopOutputSchema,
   updateRouteInputSchema,
   updateStopInputSchema,
 } from "./routes.types";
@@ -134,5 +142,57 @@ export class RoutesController {
   async getRouteHistory(routeId: string): Promise<RouteHistoryOutput> {
     const result = await this.service.getRouteHistory(routeId);
     return routeHistoryOutputSchema.parse(result);
+  }
+
+  async correctTimestamps(
+    routeId: string,
+    stopId: string,
+    input: CorrectTimestampsInput,
+    actorId: string,
+    isManager: boolean,
+  ) {
+    const validated = correctTimestampsInputSchema.parse(input);
+    const result = await this.service.correctTimestamps(
+      routeId,
+      stopId,
+      validated,
+      actorId,
+      isManager,
+    );
+    return result ? stopOutputSchema.parse(result) : null;
+  }
+
+  async getDriverRouteWithDwell(
+    driverId: string,
+    date: Date,
+  ): Promise<DriverRouteOutput | null> {
+    const result = await this.service.getDriverRouteWithDwell(driverId, date);
+    return result ? driverRouteOutputSchema.parse(result) : null;
+  }
+
+  async startShift(
+    routeId: string,
+    input: StartShiftInput,
+    driverId: string,
+  ): Promise<RouteWithStopsOutput> {
+    const validated = startShiftInputSchema.parse(input);
+    const result = await this.service.startShift(routeId, validated, driverId);
+    return routeWithStopsOutputSchema.parse(result);
+  }
+
+  async checkIn(
+    stopId: string,
+    driverId: string,
+  ): Promise<{ stop: Stop; dwellSeconds: number }> {
+    const validated = checkInInputSchema.parse({ stopId });
+    return this.service.checkIn(validated.stopId, driverId);
+  }
+
+  async checkOut(
+    stopId: string,
+    driverId: string,
+  ): Promise<{ stop: Stop; dwellSeconds: number }> {
+    const validated = checkOutInputSchema.parse({ stopId });
+    return this.service.checkOut(validated.stopId, driverId);
   }
 }

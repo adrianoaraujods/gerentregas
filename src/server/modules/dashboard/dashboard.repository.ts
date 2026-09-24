@@ -12,6 +12,20 @@ export class DashboardRepository {
     return 8 * 60;
   }
 
+  private computeDwellMinutes(
+    arrivalAt: Date | null,
+    departureAt: Date | null,
+  ): number {
+    if (
+      !arrivalAt ||
+      !departureAt ||
+      departureAt.getTime() <= arrivalAt.getTime()
+    ) {
+      return 0;
+    }
+    return Math.round((departureAt.getTime() - arrivalAt.getTime()) / 60000);
+  }
+
   async getStandardWorkdayDuration(): Promise<number> {
     const [row] = await this.db
       .select({ standardWorkdayDuration: parameter.standardWorkdayDuration })
@@ -66,7 +80,8 @@ export class DashboardRepository {
         pointId: stop.pointId,
         pointName: point.name,
         address: point.address,
-        concludedAt: stop.concludedAt,
+        arrivalAt: stop.arrivalAt,
+        departureAt: stop.departureAt,
       })
       .from(stop)
       .leftJoin(point, eq(stop.pointId, point.id))
@@ -97,26 +112,16 @@ export class DashboardRepository {
     let totalDwellMinutes = 0;
 
     for (const [, routeStops] of stopsByRoute) {
-      for (let i = 0; i < routeStops.length; i++) {
-        const currentStop = routeStops[i];
-        const isOrigin = currentStop.order === "1";
+      for (const currentStop of routeStops) {
+        const arrivalTime = currentStop.arrivalAt;
+        const departureTime = currentStop.departureAt;
 
-        let arrivalTime: Date | null = null;
-        let dwellMinutes = 0;
+        const dwellMinutes =
+          currentStop.order === "1"
+            ? 0
+            : this.computeDwellMinutes(arrivalTime, departureTime);
+        totalDwellMinutes += dwellMinutes;
 
-        if (!isOrigin && i > 0) {
-          const prevStop = routeStops[i - 1];
-          if (prevStop.concludedAt && currentStop.concludedAt) {
-            arrivalTime = prevStop.concludedAt;
-            const diffMs =
-              currentStop.concludedAt.getTime() -
-              prevStop.concludedAt.getTime();
-            dwellMinutes = Math.round(diffMs / 60000);
-            totalDwellMinutes += dwellMinutes;
-          }
-        }
-
-        const departureTime = currentStop.concludedAt;
         const startHour = arrivalTime
           ? arrivalTime.getHours() + arrivalTime.getMinutes() / 60
           : departureTime
@@ -159,23 +164,24 @@ export class DashboardRepository {
           ${stop.id} as stop_id,
           ${stop.routeId} as route_id,
           ${stop.order} as stop_order,
-          ${stop.concludedAt} as concluded_at,
-          LAG(${stop.concludedAt}) OVER (PARTITION BY ${route.id} ORDER BY ${stop.order}) as prev_concluded_at
+          ${stop.arrivalAt} as arrival_at,
+          ${stop.departureAt} as departure_at
         FROM ${route}
         LEFT JOIN ${stop} ON (${stop.routeId} = ${route.id} AND ${stop.deletedAt} IS NULL)
         WHERE ${route.date} >= ${startDate.toISOString()}
           AND ${route.date} <= ${endDate.toISOString()}
           AND ${route.deletedAt} IS NULL
           AND ${stop.order} != '1'
-          AND ${stop.concludedAt} IS NOT NULL
+          AND ${stop.arrivalAt} IS NOT NULL
+          AND ${stop.departureAt} IS NOT NULL
+          AND ${stop.departureAt} > ${stop.arrivalAt}
       ),
       daily_dwell AS (
         SELECT
           date,
-          SUM(EXTRACT(EPOCH FROM (concluded_at - prev_concluded_at)) / 60) as total_dwell_minutes,
+          SUM(ROUND(EXTRACT(EPOCH FROM (departure_at - arrival_at)) / 60)) as total_dwell_minutes,
           COUNT(*) as stops_count
         FROM stop_dwell
-        WHERE prev_concluded_at IS NOT NULL
         GROUP BY date
       )
       SELECT date, COALESCE(total_dwell_minutes, 0) as total_dwell_minutes, COALESCE(stops_count, 0) as stops_count
@@ -319,7 +325,8 @@ export class DashboardRepository {
         pointId: stop.pointId,
         pointName: point.name,
         address: point.address,
-        concludedAt: stop.concludedAt,
+        arrivalAt: stop.arrivalAt,
+        departureAt: stop.departureAt,
       })
       .from(stop)
       .leftJoin(point, eq(stop.pointId, point.id))
@@ -328,7 +335,8 @@ export class DashboardRepository {
           inArray(stop.routeId, routeIds),
           isNull(stop.deletedAt),
           sql`${stop.order} != '1'`,
-          sql`${stop.concludedAt} IS NOT NULL`,
+          sql`${stop.arrivalAt} IS NOT NULL`,
+          sql`${stop.departureAt} IS NOT NULL`,
         ),
       )
       .orderBy(stop.routeId, stop.order);
@@ -361,22 +369,14 @@ export class DashboardRepository {
       const routeInfo = routeMap.get(routeId);
       if (!routeInfo) continue;
 
-      for (let i = 0; i < routeStops.length; i++) {
-        const currentStop = routeStops[i];
-        let arrivalTime: Date | null = null;
-        let dwellMinutes = 0;
-
-        if (i > 0) {
-          const prevStop = routeStops[i - 1];
-          if (prevStop.concludedAt && currentStop.concludedAt) {
-            arrivalTime = prevStop.concludedAt;
-            const diffMs =
-              currentStop.concludedAt.getTime() -
-              prevStop.concludedAt.getTime();
-            dwellMinutes = Math.round(diffMs / 60000);
-            totalDwellMinutes += dwellMinutes;
-          }
-        }
+      for (const currentStop of routeStops) {
+        const arrivalTime = currentStop.arrivalAt;
+        const departureTime = currentStop.departureAt;
+        const dwellMinutes = this.computeDwellMinutes(
+          arrivalTime,
+          departureTime,
+        );
+        totalDwellMinutes += dwellMinutes;
 
         result.push({
           routeId,
@@ -388,7 +388,7 @@ export class DashboardRepository {
           pointName: currentStop.pointName ?? "Ponto desconhecido",
           address: currentStop.address ?? "Endereço não informado",
           arrivalTime,
-          departureTime: currentStop.concludedAt,
+          departureTime,
           dwellMinutes,
         });
       }

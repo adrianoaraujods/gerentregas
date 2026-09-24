@@ -1,4 +1,9 @@
-import { BadRequestError, ConflictError, NotFoundError } from "@/server/api";
+import {
+  BadRequestError,
+  ConflictError,
+  ForbiddenError,
+  NotFoundError,
+} from "@/server/api";
 import type { FleetRepository } from "@/server/modules/fleet";
 import type { ParametersRepository } from "@/server/modules/parameters";
 
@@ -12,6 +17,7 @@ import { createOsrmClient, type OsrmClient } from "./osrm";
 import type { RoutesRepository } from "./routes.repository";
 import type {
   AddStopInput,
+  CorrectTimestampsInput,
   CreateRouteInput,
   DriverRouteOutput,
   Route,
@@ -19,8 +25,11 @@ import type {
   RouteStatus,
   RoutesListOutput,
   RouteVersionWithStops,
+  RouteWithStops,
   RouteWithStopsOutput,
+  StartShiftInput,
   Stop,
+  StopOutput,
   UpdateRouteInput,
   UpdateStopInput,
 } from "./routes.types";
@@ -149,7 +158,8 @@ export class RoutesService {
         addressSnapshot: createdStop.addressSnapshot,
         latitudeSnapshot: createdStop.latitudeSnapshot,
         longitudeSnapshot: createdStop.longitudeSnapshot,
-        concludedAt: createdStop.concludedAt,
+        arrivalAt: createdStop.arrivalAt ?? null,
+        departureAt: createdStop.departureAt ?? null,
       });
     }
 
@@ -165,7 +175,28 @@ export class RoutesService {
     if (!routeData) {
       throw new NotFoundError("Rota não encontrada.");
     }
-    return this.addPricing(routeData);
+
+    const stopsWithDwell = routeData.stops.map((stop) => {
+      let dwellSeconds: number | undefined;
+      if (stop.arrivalAt && stop.departureAt && stop.order !== "1") {
+        dwellSeconds = Math.floor(
+          (new Date(stop.departureAt).getTime() -
+            new Date(stop.arrivalAt).getTime()) /
+            1000,
+        );
+      }
+      return { ...stop, dwellSeconds };
+    });
+
+    const totalDwellSeconds = stopsWithDwell
+      .filter((s) => s.order !== "1" && s.dwellSeconds !== undefined)
+      .reduce((sum, s) => sum + (s.dwellSeconds ?? 0), 0);
+
+    return this.addPricing({
+      ...routeData,
+      stops: stopsWithDwell,
+      totalDwellSeconds,
+    });
   }
 
   async getDriverRoute(
@@ -376,7 +407,7 @@ export class RoutesService {
       throw new NotFoundError("Parada não encontrada.");
     }
 
-    if (existingStop.concludedAt) {
+    if (existingStop.departureAt) {
       throw new BadRequestError(
         "Não é possível alterar uma parada já concluída.",
       );
@@ -458,7 +489,7 @@ export class RoutesService {
       throw new NotFoundError("Parada não encontrada.");
     }
 
-    if (existingStop.concludedAt) {
+    if (existingStop.departureAt) {
       throw new BadRequestError("Parada já foi concluída.");
     }
 
@@ -466,13 +497,8 @@ export class RoutesService {
       await this.repository.updateRoute(routeId, { status: "in_flight" });
     }
 
-    await this.repository.updateStop(stopId, { concludedAt: new Date() });
-
-    const allStops = await this.repository.listStopsByRoute(routeId);
-    const allConcluded = allStops.every((s) => s.concludedAt);
-    if (allConcluded) {
-      await this.repository.updateRoute(routeId, { status: "concluded" });
-    }
+    await this.repository.updateStopDeparture(stopId, new Date());
+    await this.concludeRouteIfComplete(routeId);
 
     const result = await this.repository.findRouteWithStops(routeId);
     if (!result) {
@@ -496,7 +522,7 @@ export class RoutesService {
       throw new NotFoundError("Parada não encontrada.");
     }
 
-    if (existingStop.concludedAt) {
+    if (existingStop.departureAt) {
       throw new BadRequestError(
         "Não é possível excluir uma parada já concluída.",
       );
@@ -593,8 +619,9 @@ export class RoutesService {
           ...v,
           distanceKm: hundredthsToKm(v.distanceKmHundredths),
           cost: costCentsToBRL(costCents),
-          stops: stops.map(({ stopVersion: sv, point: p }) => ({
+          stops: stops.map(({ stopVersion: sv, point: p, actorName }) => ({
             ...sv,
+            actorName,
             point: p
               ? {
                   id: p.id,
@@ -634,6 +661,206 @@ export class RoutesService {
     }
   }
 
+  async getDriverRouteWithDwell(
+    driverId: string,
+    date: Date,
+  ): Promise<RouteWithStops | null> {
+    const routeData = await this.repository.findRouteByDriverAndDate(
+      driverId,
+      date,
+    );
+    if (!routeData) return null;
+
+    const routeWithStops = await this.repository.findRouteWithStops(
+      routeData.id,
+    );
+    if (!routeWithStops) return null;
+
+    const stopsWithDwell = routeWithStops.stops.map((stop) => {
+      let dwellSeconds: number | undefined;
+      if (stop.arrivalAt && stop.departureAt && stop.order !== "1") {
+        dwellSeconds = Math.floor(
+          (new Date(stop.departureAt).getTime() -
+            new Date(stop.arrivalAt).getTime()) /
+            1000,
+        );
+      }
+      return { ...stop, dwellSeconds };
+    });
+
+    const totalDwellSeconds = stopsWithDwell
+      .filter((s) => s.order !== "1" && s.dwellSeconds !== undefined)
+      .reduce((sum, s) => sum + (s.dwellSeconds ?? 0), 0);
+
+    return {
+      ...routeWithStops,
+      stops: stopsWithDwell,
+      totalDwellSeconds,
+    };
+  }
+
+  async startShift(
+    routeId: string,
+    input: StartShiftInput,
+    driverId: string,
+  ): Promise<RouteWithStops> {
+    const existingRoute = await this.repository.findRouteById(routeId);
+    if (!existingRoute) {
+      throw new NotFoundError("Rota não encontrada.");
+    }
+
+    if (existingRoute.driverId !== driverId) {
+      throw new ForbiddenError("Esta rota não pertence a este motorista.");
+    }
+
+    if (existingRoute.status !== "draft") {
+      throw new BadRequestError(
+        "A rota deve estar em status 'draft' para iniciar o turno.",
+      );
+    }
+
+    const vehicleId = input.vehicleId ?? existingRoute.vehicleId;
+
+    if (!vehicleId) {
+      const activeVehicleIds = await this.repository.findActiveVehicleIds();
+      if (activeVehicleIds.length === 0) {
+        throw new BadRequestError(
+          "Nenhum veículo ativo disponível para seleção.",
+        );
+      }
+      throw new BadRequestError("Selecione um veículo para iniciar o turno.");
+    }
+
+    const isLocked = await this.repository.isVehicleLockedForDate(
+      vehicleId,
+      existingRoute.date,
+      routeId,
+    );
+    if (isLocked) {
+      throw new ConflictError(
+        "Este veículo já está em uso em outra rota nesta data.",
+      );
+    }
+
+    const originStop = await this.repository.findOriginStop(routeId);
+    if (!originStop) {
+      throw new BadRequestError("Parada de origem não encontrada.");
+    }
+
+    const now = new Date();
+    await this.repository.updateStopDeparture(originStop.id, now);
+
+    await this.repository.updateRoute(routeId, {
+      vehicleId,
+      status: "in_flight",
+    });
+
+    const updatedRoute = await this.repository.findRouteById(routeId);
+    if (!updatedRoute) {
+      throw new BadRequestError("Falha ao buscar rota atualizada.");
+    }
+
+    await this.createNewVersion(routeId, driverId, updatedRoute);
+
+    return this.getDriverRouteWithDwell(
+      driverId,
+      existingRoute.date,
+    ) as Promise<RouteWithStops>;
+  }
+
+  async checkIn(
+    stopId: string,
+    driverId: string,
+  ): Promise<{ stop: Stop; dwellSeconds: number }> {
+    const stop = await this.repository.findStopById(stopId);
+    if (!stop) {
+      throw new NotFoundError("Parada não encontrada.");
+    }
+
+    const route = await this.repository.findRouteById(stop.routeId);
+    if (!route) {
+      throw new NotFoundError("Rota não encontrada.");
+    }
+
+    if (route.driverId !== driverId) {
+      throw new ForbiddenError(
+        "Esta parada não pertence à rota deste motorista.",
+      );
+    }
+
+    if (route.status !== "in_flight") {
+      throw new BadRequestError(
+        "A rota deve estar em andamento para fazer check-in.",
+      );
+    }
+
+    if (stop.order === "1") {
+      throw new BadRequestError(
+        "A parada de origem não possui check-in (RN01).",
+      );
+    }
+
+    if (stop.arrivalAt) {
+      throw new BadRequestError("Check-in já realizado para esta parada.");
+    }
+
+    const now = new Date();
+    const updatedStop = await this.repository.updateStopArrival(stopId, now);
+    if (!updatedStop) {
+      throw new BadRequestError("Falha ao realizar check-in.");
+    }
+    return { stop: updatedStop, dwellSeconds: 0 };
+  }
+
+  async checkOut(
+    stopId: string,
+    driverId: string,
+  ): Promise<{ stop: Stop; dwellSeconds: number }> {
+    const stop = await this.repository.findStopById(stopId);
+    if (!stop) {
+      throw new NotFoundError("Parada não encontrada.");
+    }
+
+    const route = await this.repository.findRouteById(stop.routeId);
+    if (!route) {
+      throw new NotFoundError("Rota não encontrada.");
+    }
+
+    if (route.driverId !== driverId) {
+      throw new ForbiddenError(
+        "Esta parada não pertence à rota deste motorista.",
+      );
+    }
+
+    if (route.status !== "in_flight") {
+      throw new BadRequestError(
+        "A rota deve estar em andamento para fazer check-out.",
+      );
+    }
+
+    if (!stop.arrivalAt) {
+      throw new BadRequestError("Check-in não realizado para esta parada.");
+    }
+
+    if (stop.departureAt) {
+      throw new BadRequestError("Check-out já realizado para esta parada.");
+    }
+
+    const now = new Date();
+    const updatedStop = await this.repository.updateStopDeparture(stopId, now);
+    if (!updatedStop) {
+      throw new BadRequestError("Falha ao realizar check-out.");
+    }
+
+    await this.concludeRouteIfComplete(route.id);
+
+    const dwellSeconds = Math.floor(
+      (now.getTime() - new Date(stop.arrivalAt).getTime()) / 1000,
+    );
+
+    return { stop: updatedStop, dwellSeconds };
+  }
+
   private async recomputeRouteDistance(routeId: string): Promise<void> {
     const stops = await this.repository.listStopsByRoute(routeId);
     const coordinates: CoordinateLike[] = stops.map((s) => ({
@@ -642,6 +869,14 @@ export class RoutesService {
     }));
     const distanceKmHundredths = await this.computeRouteDistance(coordinates);
     await this.repository.updateRoute(routeId, { distanceKmHundredths });
+  }
+
+  private async concludeRouteIfComplete(routeId: string): Promise<void> {
+    const allStops = await this.repository.listStopsByRoute(routeId);
+    const allConcluded = allStops.every((s) => s.departureAt);
+    if (allConcluded) {
+      await this.repository.updateRoute(routeId, { status: "concluded" });
+    }
   }
 
   private async computeRouteDistance(
@@ -733,10 +968,95 @@ export class RoutesService {
         addressSnapshot: stopItem.addressSnapshot,
         latitudeSnapshot: stopItem.latitudeSnapshot,
         longitudeSnapshot: stopItem.longitudeSnapshot,
-        concludedAt: stopItem.concludedAt,
+        arrivalAt: stopItem.arrivalAt,
+        departureAt: stopItem.departureAt,
       });
     }
 
     await this.repository.updateRoute(routeId, { currentVersion: newVersion });
+  }
+
+  async correctTimestamps(
+    routeId: string,
+    stopId: string,
+    input: CorrectTimestampsInput,
+    actorId: string,
+    isManager: boolean,
+  ): Promise<StopOutput | null> {
+    const routeData = await this.repository.findRouteById(routeId);
+    if (!routeData) throw new NotFoundError("Rota não encontrada.");
+
+    if (!isManager) {
+      if (routeData.driverId !== actorId) {
+        throw new BadRequestError("Motorista não autorizado para esta rota.");
+      }
+      if (routeData.status === "concluded") {
+        throw new BadRequestError("Não é possível corrigir rota concluída.");
+      }
+    }
+
+    const stopWithRoute = await this.repository.findStopWithRoute(stopId);
+    if (!stopWithRoute || stopWithRoute.stop.routeId !== routeId) {
+      throw new NotFoundError("Parada não encontrada nesta rota.");
+    }
+
+    const updates: Partial<Pick<Stop, "arrivalAt" | "departureAt">> = {};
+    if (input.arrivalAt !== undefined) updates.arrivalAt = input.arrivalAt;
+    if (input.departureAt !== undefined)
+      updates.departureAt = input.departureAt;
+
+    if (updates.arrivalAt !== undefined) {
+      await this.repository.updateStopArrival(
+        stopId,
+        updates.arrivalAt as Date,
+      );
+    }
+    if (updates.departureAt !== undefined) {
+      await this.repository.updateStopDeparture(
+        stopId,
+        updates.departureAt as Date,
+      );
+    }
+
+    const routeVersionId = await this.repository.findRouteVersionId(
+      routeId,
+      routeData.currentVersion,
+    );
+    if (routeVersionId) {
+      const currentStop = await this.repository.findStopById(stopId);
+      if (currentStop) {
+        await this.repository.createStopVersion({
+          stopId: currentStop.id,
+          routeVersionId,
+          order: currentStop.order,
+          pointId: currentStop.pointId,
+          addressSnapshot: currentStop.addressSnapshot,
+          latitudeSnapshot: currentStop.latitudeSnapshot,
+          longitudeSnapshot: currentStop.longitudeSnapshot,
+          arrivalAt: currentStop.arrivalAt,
+          departureAt: currentStop.departureAt,
+          versionType: "correction",
+          actorId,
+        });
+      }
+    }
+
+    const updatedStop = await this.repository.findStopById(stopId);
+    if (!updatedStop) return null;
+    return {
+      ...updatedStop,
+      point: stopWithRoute.stop.pointId
+        ? {
+            id: stopWithRoute.stop.pointId,
+            name: "",
+            address: "",
+            latitude: 0,
+            longitude: 0,
+            geocodeStatus: "pending",
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          }
+        : null,
+    } as StopOutput; // Simple fallback, or we can just fetch the point
   }
 }

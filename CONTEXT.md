@@ -36,6 +36,10 @@ _Avoid_: Admin, owner, supervisor
 The duration a vehicle remains stationary at a stop, calculated as departure time minus arrival time. The first stop (Origin) is excluded. Sum of all dwell times across a route equals the route's total dwell time.
 _Avoid_: Idle time, stopped time, tempo parado
 
+**Completion** (Conclusão / status derivado):
+A stop is *concluded* when it has a departure timestamp (`departure_at IS NOT NULL`); a route is concluded when every stop has one. Completion is derived, never stored — there is no separate "concluded" column. `arrival_at`/`departure_at` are the single source of truth for both dwell time and completion.
+_Avoid_: concluded_at, finished flag, flag de conclusão
+
 **Standard workday** (Jornada padrão):
 8 hours per day. Used as the denominator for dwell time percentage indicators.
 _Avoid_: shift, work period

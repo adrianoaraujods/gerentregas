@@ -27,6 +27,7 @@ export async function setup() {
 
   execSync("npm run db:push", {
     cwd: process.cwd(),
+    env: { ...process.env, DATABASE_URL_UNPOOLED: DATABASE_URL },
     stdio: "inherit",
   });
 }

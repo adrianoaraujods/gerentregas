@@ -15,25 +15,34 @@ export class SyncRepository {
       .select({ stop, route })
       .from(stop)
       .innerJoin(route, eq(stop.routeId, route.id))
-      .where(and(eq(stop.id, stopId), isNull(stop.deletedAt)))
+      .where(
+        and(
+          eq(stop.id, stopId),
+          isNull(stop.deletedAt),
+          isNull(route.deletedAt),
+        ),
+      )
       .limit(1);
     return row ?? null;
   }
 
-  async concludeStopIfOpen(
+  async updateStopArrival(stopId: string, arrivalAt: Date): Promise<boolean> {
+    const [row] = await this.db
+      .update(stop)
+      .set({ arrivalAt, updatedAt: new Date() })
+      .where(and(eq(stop.id, stopId), isNull(stop.deletedAt)))
+      .returning({ id: stop.id });
+    return !!row;
+  }
+
+  async updateStopDeparture(
     stopId: string,
-    concludedAt: Date,
+    departureAt: Date,
   ): Promise<boolean> {
     const [row] = await this.db
       .update(stop)
-      .set({ concludedAt, updatedAt: new Date() })
-      .where(
-        and(
-          eq(stop.id, stopId),
-          isNull(stop.concludedAt),
-          isNull(stop.deletedAt),
-        ),
-      )
+      .set({ departureAt, updatedAt: new Date() })
+      .where(and(eq(stop.id, stopId), isNull(stop.deletedAt)))
       .returning({ id: stop.id });
     return !!row;
   }
@@ -61,7 +70,7 @@ export class SyncRepository {
       .where(
         and(
           eq(stop.routeId, routeId),
-          isNull(stop.concludedAt),
+          isNull(stop.departureAt),
           isNull(stop.deletedAt),
         ),
       );

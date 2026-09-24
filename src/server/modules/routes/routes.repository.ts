@@ -1,5 +1,6 @@
 import { and, count, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import type { Database } from "@/server/db";
+import { vehicle } from "@/server/db/schemas/fleet";
 import { point } from "@/server/db/schemas/points";
 import {
   route,
@@ -84,7 +85,10 @@ export class RoutesRepository {
     addressSnapshot: string;
     latitudeSnapshot: number | null;
     longitudeSnapshot: number | null;
-    concludedAt: Date | null;
+    arrivalAt: Date | null;
+    departureAt: Date | null;
+    versionType?: "structural" | "correction";
+    actorId?: string | null;
   }): Promise<StopVersion | null> {
     const [row] = await this.db
       .insert(stopVersion)
@@ -262,7 +266,7 @@ export class RoutesRepository {
         and(
           eq(stop.routeId, routeId),
           isNull(stop.deletedAt),
-          sql`${stop.concludedAt} IS NOT NULL`,
+          sql`${stop.departureAt} IS NOT NULL`,
         ),
       )
       .orderBy(desc(stop.order))
@@ -315,13 +319,11 @@ export class RoutesRepository {
 
   async updateStop(
     id: string,
-    input: Partial<Pick<Stop, "pointId" | "order" | "concludedAt">>,
+    input: Partial<Pick<Stop, "pointId" | "order">>,
   ): Promise<Stop | null> {
     const updates: Record<string, unknown> = {};
     if (input.pointId !== undefined) updates.pointId = input.pointId;
     if (input.order !== undefined) updates.order = input.order;
-    if (input.concludedAt !== undefined)
-      updates.concludedAt = input.concludedAt;
     if (Object.keys(updates).length === 0) return null;
 
     updates.updatedAt = new Date();
@@ -459,10 +461,125 @@ export class RoutesRepository {
       .select({
         stopVersion: stopVersion,
         point: point,
+        actorName: sql<
+          string | null
+        >`(SELECT name FROM "user" WHERE id = ${stopVersion.actorId})`.as(
+          "actor_name",
+        ),
       })
       .from(stopVersion)
       .leftJoin(point, eq(stopVersion.pointId, point.id))
       .where(eq(stopVersion.routeVersionId, routeVersionId))
       .orderBy(stopVersion.order);
+  }
+
+  async updateStopArrival(
+    stopId: string,
+    arrivalAt: Date,
+  ): Promise<Stop | null> {
+    const [row] = await this.db
+      .update(stop)
+      .set({ arrivalAt, updatedAt: new Date() })
+      .where(and(eq(stop.id, stopId), isNull(stop.deletedAt)))
+      .returning();
+    return row ?? null;
+  }
+
+  async updateStopDeparture(
+    stopId: string,
+    departureAt: Date,
+  ): Promise<Stop | null> {
+    const [row] = await this.db
+      .update(stop)
+      .set({ departureAt, updatedAt: new Date() })
+      .where(and(eq(stop.id, stopId), isNull(stop.deletedAt)))
+      .returning();
+    return row ?? null;
+  }
+
+  async findActiveVehicleIds(): Promise<string[]> {
+    const rows = await this.db
+      .select({ id: vehicle.id })
+      .from(vehicle)
+      .where(eq(vehicle.active, true));
+    return rows.map((r) => r.id);
+  }
+
+  async isVehicleLockedForDate(
+    vehicleId: string,
+    date: Date,
+    excludeRouteId?: string,
+  ): Promise<boolean> {
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const conditions = [
+      eq(route.vehicleId, vehicleId),
+      eq(route.status, "in_flight"),
+      sql`${route.date} >= ${startOfDay.toISOString()}`,
+      sql`${route.date} <= ${endOfDay.toISOString()}`,
+      isNull(route.deletedAt),
+    ];
+    if (excludeRouteId) conditions.push(sql`${route.id} != ${excludeRouteId}`);
+
+    const [row] = await this.db
+      .select({ id: route.id })
+      .from(route)
+      .where(and(...conditions))
+      .limit(1);
+    return !!row;
+  }
+
+  async findOriginStop(routeId: string): Promise<Stop | null> {
+    const [row] = await this.db
+      .select()
+      .from(stop)
+      .where(
+        and(
+          eq(stop.routeId, routeId),
+          eq(stop.order, "1"),
+          isNull(stop.deletedAt),
+        ),
+      )
+      .limit(1);
+    return row ?? null;
+  }
+
+  async findStopWithRoute(
+    stopId: string,
+  ): Promise<{ stop: Stop; route: Route } | null> {
+    const [row] = await this.db
+      .select({
+        stop: stop,
+        route: route,
+      })
+      .from(stop)
+      .innerJoin(route, eq(stop.routeId, route.id))
+      .where(
+        and(
+          eq(stop.id, stopId),
+          isNull(stop.deletedAt),
+          isNull(route.deletedAt),
+        ),
+      )
+      .limit(1);
+    return row ?? null;
+  }
+
+  async isRouteInFlight(routeId: string): Promise<boolean> {
+    const [row] = await this.db
+      .select({ id: route.id })
+      .from(route)
+      .where(
+        and(
+          eq(route.id, routeId),
+          eq(route.status, "in_flight"),
+          isNull(route.deletedAt),
+        ),
+      )
+      .limit(1);
+    return !!row;
   }
 }

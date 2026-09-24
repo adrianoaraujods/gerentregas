@@ -309,7 +309,8 @@ export async function main() {
       const stopsCreated: Array<{
         id: string;
         order: string;
-        concludedAt: Date | null;
+        arrivalAt: Date | null;
+        departureAt: Date | null;
       }> = [];
 
       let currentTime = new Date(routeDate);
@@ -318,15 +319,28 @@ export async function main() {
         const stopId = crypto.randomUUID();
         const order = String(j + 1);
         const pointItem = selectedPoints[j];
+        const isOrigin = order === "1";
 
-        let concludedAt: Date | null = null;
+        let arrivalAt: Date | null = null;
+        let departureAt: Date | null = null;
         if (
           status === "concluded" ||
           (status === "in_flight" && j < numStops - 1)
         ) {
-          const interval = Math.floor(Math.random() * 31) + 15;
-          currentTime = addMinutes(currentTime, interval);
-          concludedAt = new Date(currentTime);
+          const travel = Math.floor(Math.random() * 31) + 15;
+          currentTime = addMinutes(currentTime, travel);
+          if (isOrigin) {
+            departureAt = new Date(currentTime);
+          } else {
+            arrivalAt = new Date(currentTime);
+            const dwell = Math.floor(Math.random() * 26) + 10;
+            currentTime = addMinutes(currentTime, dwell);
+            departureAt = new Date(currentTime);
+          }
+        } else if (status === "in_flight" && j === numStops - 1 && !isOrigin) {
+          const travel = Math.floor(Math.random() * 31) + 15;
+          currentTime = addMinutes(currentTime, travel);
+          arrivalAt = new Date(currentTime);
         }
 
         await db.insert(stop).values({
@@ -337,12 +351,13 @@ export async function main() {
           addressSnapshot: pointItem.address,
           latitudeSnapshot: pointItem.latitude,
           longitudeSnapshot: pointItem.longitude,
-          concludedAt,
+          arrivalAt,
+          departureAt,
           createdAt: routeDate,
           updatedAt: routeDate,
         });
 
-        stopsCreated.push({ id: stopId, order, concludedAt });
+        stopsCreated.push({ id: stopId, order, arrivalAt, departureAt });
       }
 
       await db.insert(routeVersion).values({
@@ -378,7 +393,8 @@ export async function main() {
             addressSnapshot: pointItem.address,
             latitudeSnapshot: pointItem.latitude,
             longitudeSnapshot: pointItem.longitude,
-            concludedAt: stopItem.concludedAt,
+            arrivalAt: stopItem.arrivalAt,
+            departureAt: stopItem.departureAt,
             createdAt: routeDate,
           });
         }
