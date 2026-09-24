@@ -57,14 +57,18 @@ export function DayTimelineChart({
 
   const chartData = stops
     .filter((s) => s.dwellMinutes > 0)
-    .map((stop, index) => ({
-      ...stop,
-      index,
-      x: stop.startHour,
-      width: Math.max(stop.dwellHours, 0.25),
-      name: stop.pointName,
-      color: `hsl(var(--chart-${(index % 5) + 1}))`,
-    }));
+    .map((stop, index) => {
+      const minDuration = 0.25; // min 15 minutes for visibility
+      const endHour = stop.startHour + Math.max(stop.dwellHours, minDuration);
+      
+      return {
+        ...stop,
+        index,
+        timeRange: [stop.startHour, Math.min(endHour, 24)], // cap at 24:00
+        name: stop.pointName,
+        color: `hsl(var(--chart-${(index % 5) + 1}))`,
+      };
+    });
 
   const totalDwellMinutes = stops.reduce((sum, s) => sum + s.dwellMinutes, 0);
   const totalDwellHours = totalDwellMinutes / 60;
@@ -156,8 +160,8 @@ export function DayTimelineChart({
           <Tooltip content={CustomTooltipWrapper} />
           <Legend />
           <BarWrapper
-            dataKey="width"
-            radius={[0, 4, 4, 0]}
+            dataKey="timeRange"
+            radius={[4, 4, 4, 4]}
             minPointSize={0}
             shape={(
               props: BarShapeProps & {

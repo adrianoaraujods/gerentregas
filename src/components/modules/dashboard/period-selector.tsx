@@ -44,6 +44,7 @@ export function PeriodSelector({
   const [monthPopoverOpen, setMonthPopoverOpen] = useState(false);
   const [rangePopoverOpen, setRangePopoverOpen] = useState(false);
   const [dayMonth, setDayMonth] = useState(date);
+  const [pickerMonth, setPickerMonth] = useState(new Date(month.year, month.month - 1));
   const [rangeMonth, setRangeMonth] = useState(dateRange.from || new Date());
 
   const handleDaySelect = (day: Date | undefined) => {
@@ -146,9 +147,9 @@ export function PeriodSelector({
             <PopoverContent className="w-auto p-0" align="start">
               <Calendar
                 mode="single"
-                month={new Date(month.year, month.month - 1)}
+                month={pickerMonth}
                 selected={new Date(month.year, month.month - 1)}
-                onMonthChange={() => setMonthPopoverOpen(true)}
+                onMonthChange={setPickerMonth}
                 captionLayout="dropdown"
                 onSelect={handleMonthSelect}
               />

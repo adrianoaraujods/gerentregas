@@ -59,13 +59,17 @@ export function MonthBarChart({
     );
   }
 
-  const chartData = data.map((d, index) => ({
-    ...d,
-    label: formatShortDate(d.date),
-    dwellHours: (d.totalDwellMinutes / 60).toFixed(1),
-    color: `hsl(var(--chart-${(index % 5) + 1}))`,
-    index,
-  }));
+  const chartData = data.map((d, index) => {
+    const dwellHoursNum = Number((d.totalDwellMinutes / 60).toFixed(2));
+    return {
+      ...d,
+      label: formatShortDate(d.date),
+      dwellHours: dwellHoursNum.toFixed(1),
+      dwellHoursNum,
+      color: `hsl(var(--chart-${(index % 5) + 1}))`,
+      index,
+    };
+  });
 
   const workdayHours = workdayMinutes / 60;
 
@@ -167,8 +171,8 @@ export function MonthBarChart({
             />
           )}
           <BarWrapper
-            dataKey="totalDwellMinutes"
-            radius={[4, 0, 0, 4]}
+            dataKey="dwellHoursNum"
+            radius={[0, 4, 4, 0]}
             minPointSize={0}
             onClick={handleBarClick}
           >
