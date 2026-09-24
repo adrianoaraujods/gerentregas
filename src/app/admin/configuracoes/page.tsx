@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { MoneyField } from "@/components/fields/money-field";
+import { NumberField } from "@/components/fields/number-field";
 import { useAppForm } from "@/components/hooks/use-app-form";
 import {
   Card,
@@ -35,7 +37,10 @@ export default function ConfiguracoesPage() {
     },
     onSubmit: async ({ value }) => {
       setIsLoading(true);
-      updateMutation.mutate(value);
+      updateMutation.mutate({
+        fuelPricePerLiter: Number(value.fuelPricePerLiter),
+        standardWorkdayDuration: Number(value.standardWorkdayDuration),
+      });
     },
   });
 
@@ -93,27 +98,22 @@ export default function ConfiguracoesPage() {
               render={
                 <FieldGroup>
                   <form.AppField name="fuelPricePerLiter">
-                    {(field) => (
-                      <field.TextField
+                    {() => (
+                      <MoneyField
                         label="Preço do combustível (R$/L)"
                         props={{
-                          type: "number",
-                          step: "0.01",
-                          min: "0.01",
-                          placeholder: "6.00",
                           disabled: isLoading,
+                          placeholder: "0,00",
                         }}
                       />
                     )}
                   </form.AppField>
 
                   <form.AppField name="standardWorkdayDuration">
-                    {(field) => (
-                      <field.TextField
+                    {() => (
+                      <NumberField
                         label="Jornada padrão (minutos)"
                         props={{
-                          type: "number",
-                          step: "1",
                           min: "1",
                           placeholder: "480",
                           disabled: isLoading,
