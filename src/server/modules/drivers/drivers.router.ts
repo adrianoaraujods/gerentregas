@@ -31,9 +31,9 @@ export const driversRouter = createRouter({
 
   list: managerProcedure
     .input(listDriversInputSchema)
-    .query(({ ctx: { db }, input }) =>
+    .query(({ ctx: { db, session }, input }) =>
       createController(db)
-        .listDrivers(input)
+        .listDrivers(input, session.user.role === "admin")
         .then(driversListOutputSchema.parse),
     ),
 

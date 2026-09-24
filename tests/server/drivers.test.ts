@@ -86,7 +86,7 @@ describe("drivers router", () => {
       expect(result.name).toBe("João Motorista");
       expect(result.email).toBe("joao@test.com");
       expect(result.phone).toBe("+5511999999999");
-      expect(result.document).toBe("12345678901");
+      expect(result.document).toBe("***.***.***-01"); // masked, no plaintext in response
       expect(result.role).toBe("driver");
     });
 
@@ -272,6 +272,41 @@ describe("drivers router", () => {
       expect(page2.drivers.length).toBe(2);
     });
 
+    it("filters by search term matching name or email", async () => {
+      await managerCaller.drivers.create({
+        name: "Carlos Silva",
+        email: "carlos@test.com",
+        password: "senha123",
+        phone: "+5511999999999",
+        document: "11111111111",
+      });
+
+      await managerCaller.drivers.create({
+        name: "Ana Souza",
+        email: "ana@test.com",
+        password: "senha123",
+        phone: "+5511888888888",
+        document: "22222222222",
+      });
+
+      const byName = await managerCaller.drivers.list({
+        limit: 10,
+        offset: 0,
+        search: "carlos",
+      });
+      expect(byName.drivers.length).toBe(1);
+      expect(byName.drivers[0].name).toBe("Carlos Silva");
+      expect(byName.total).toBe(1);
+
+      const byEmail = await managerCaller.drivers.list({
+        limit: 10,
+        offset: 0,
+        search: "ana@test",
+      });
+      expect(byEmail.drivers.length).toBe(1);
+      expect(byEmail.drivers[0].name).toBe("Ana Souza");
+    });
+
     it("filters by role", async () => {
       await managerCaller.drivers.create({
         name: "Driver 1",
@@ -298,13 +333,70 @@ describe("drivers router", () => {
       expect(drivers.drivers.length).toBe(1);
       expect(drivers.drivers[0].role).toBe("driver");
 
-      const managers = await managerCaller.drivers.list({
+      const managers = await adminCaller.drivers.list({
         limit: 10,
         offset: 0,
         role: "manager",
       });
       expect(managers.drivers.length).toBe(1);
       expect(managers.drivers[0].role).toBe("manager");
+    });
+
+    it("excludes managers from manager's default list", async () => {
+      await managerCaller.drivers.create({
+        name: "Driver 1",
+        email: "driver1@test.com",
+        password: "senha123",
+        phone: "+5511999999999",
+        document: "11111111111",
+      });
+
+      await adminCaller.drivers.createManager({
+        name: "Manager 1",
+        email: "manager1@test.com",
+        password: "senha123",
+        phone: "+5511888888888",
+        document: "22222222222",
+        role: "manager",
+      });
+
+      const managerList = await managerCaller.drivers.list({
+        limit: 10,
+        offset: 0,
+      });
+      expect(managerList.drivers.every((d) => d.role === "driver")).toBe(true);
+
+      const adminList = await adminCaller.drivers.list({
+        limit: 10,
+        offset: 0,
+      });
+      expect(adminList.drivers.length).toBe(2);
+    });
+
+    it("rejects manager listing managers", async () => {
+      await expect(
+        managerCaller.drivers.list({
+          limit: 10,
+          offset: 0,
+          role: "manager",
+        }),
+      ).rejects.toThrow(ForbiddenError);
+    });
+
+    it("returns masked document in list (no plaintext)", async () => {
+      await managerCaller.drivers.create({
+        name: "Driver 1",
+        email: "driver1@test.com",
+        password: "senha123",
+        phone: "+5511999999999",
+        document: "11111111111",
+      });
+
+      const result = await managerCaller.drivers.list({
+        limit: 10,
+        offset: 0,
+      });
+      expect(result.drivers[0].document).toBe("***.***.***-11");
     });
   });
 
@@ -321,7 +413,7 @@ describe("drivers router", () => {
       const result = await managerCaller.drivers.get({ id: created.id });
       expect(result.id).toBe(created.id);
       expect(result.name).toBe("Driver 1");
-      expect(result.document).toBe("11111111111"); // decrypted
+      expect(result.document).toBe("***.***.***-11"); // masked, no plaintext in response
     });
 
     it("rejects get by driver role", async () => {
@@ -363,7 +455,7 @@ describe("drivers router", () => {
 
       expect(result.name).toBe("Driver 1 Updated");
       expect(result.phone).toBe("+5511888888888");
-      expect(result.document).toBe("11111111111"); // unchanged
+      expect(result.document).toBe("***.***.***-11"); // masked, unchanged
     });
 
     it("allows updating document (re-encrypts)", async () => {
@@ -380,7 +472,7 @@ describe("drivers router", () => {
         document: "22222222222",
       });
 
-      expect(result.document).toBe("22222222222");
+      expect(result.document).toBe("***.***.***-22"); // masked
     });
 
     it("rejects update by driver role", async () => {
