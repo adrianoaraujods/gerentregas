@@ -29,8 +29,8 @@ export class DriversController {
     return this.service.getDriver(id);
   }
 
-  listDrivers(input: ListDriversInput) {
-    return this.service.listDrivers(input);
+  listDrivers(input: ListDriversInput, isAdmin = false) {
+    return this.service.listDrivers(input, isAdmin);
   }
 
   updateDriver(id: string, input: UpdateDriverInput): Promise<DriverOutput> {

@@ -1,11 +1,12 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import * as React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { api } from "@/lib/api/client";
+import type { GetAggregationInput } from "@/server/modules/dashboard";
 import { CustomBarChart, MonthBarChart } from "./bar-charts";
 import { CsvExportButton } from "./csv-export";
 import { DayTimelineChart } from "./day-timeline-chart";
@@ -84,73 +85,59 @@ export function DashboardContent() {
   const [drilldownWorkdayPct, setDrilldownWorkdayPct] = React.useState(0);
   const [workdayMinutes, setWorkdayMinutes] = React.useState(480);
 
-  const buildQueryParams = () => {
-    const params: Record<string, string> = { periodType };
+  const utils = api.useUtils();
+
+  const buildInput = (): GetAggregationInput => {
+    const input: GetAggregationInput = { periodType };
     if (periodType === "day" && date) {
-      params.date = date.toISOString();
+      input.date = date.toISOString();
     } else if (periodType === "month") {
-      params.year = month.year.toString();
-      params.month = month.month.toString();
+      input.year = month.year;
+      input.month = month.month;
     } else if (periodType === "custom" && dateRange.from && dateRange.to) {
-      params.dateFrom = dateRange.from.toISOString();
-      params.dateTo = dateRange.to.toISOString();
+      input.dateFrom = dateRange.from.toISOString();
+      input.dateTo = dateRange.to.toISOString();
     }
-    return params;
+    return input;
   };
 
-  const { data: aggregation, isLoading: loadingAggregation } = useQuery({
-    queryKey: ["dashboard", "aggregation", buildQueryParams()],
-    queryFn: async () => {
-      const params = new URLSearchParams(buildQueryParams());
-      const res = await fetch(`/api/trpc/dashboard.getAggregation?${params}`);
-      if (!res.ok) throw new Error("Erro ao buscar agregação");
-      const json = await res.json();
-      return json.result.data as DashboardData;
-    },
-    enabled: true,
-  });
+  const { data: aggregationRaw, isLoading: loadingAggregation } =
+    api.dashboard.getAggregation.useQuery(buildInput());
+  const aggregation = aggregationRaw as DashboardData | undefined;
 
-  const { data: workdayData } = useQuery({
-    queryKey: ["dashboard", "workday"],
-    queryFn: async () => {
-      const res = await fetch("/api/trpc/dashboard.getStandardWorkdayDuration");
-      if (!res.ok) return 480;
-      const json = await res.json();
-      return json.result.data.standardWorkdayDuration;
-    },
-    staleTime: 5 * 60 * 1000,
-  });
+  const { data: workdayData } =
+    api.dashboard.getStandardWorkdayDuration.useQuery(undefined, {
+      staleTime: 5 * 60 * 1000,
+    });
 
   React.useEffect(() => {
-    if (workdayData) setWorkdayMinutes(workdayData);
+    if (workdayData) setWorkdayMinutes(workdayData.standardWorkdayDuration);
   }, [workdayData]);
 
   const handleDrilldown = async (periodKey: string) => {
-    const params = new URLSearchParams(buildQueryParams());
-    if (periodType === "day") {
-      params.set("date", periodKey);
-    } else if (periodType === "month") {
-      params.set("year", month.year.toString());
-      params.set("month", month.month.toString());
-    } else if (periodType === "custom") {
-      params.set("dateFrom", periodKey);
+    let drilldownInput: GetAggregationInput;
+
+    if (periodType === "month" || periodType === "custom") {
+      drilldownInput = {
+        periodType: "day",
+        date: new Date(periodKey).toISOString(),
+      };
+    } else {
+      drilldownInput = { periodType: "day", date: date.toISOString() };
     }
 
     try {
-      const res = await fetch(`/api/trpc/dashboard.getDrilldown?${params}`);
-      if (!res.ok) throw new Error("Erro ao buscar detalhes");
-      const json = await res.json();
-      const data = json.result.data;
+      const data = await utils.dashboard.getDrilldown.fetch(drilldownInput);
 
       setDrilldownStops(data.stops);
       setDrilldownTotal(data.totalDwellMinutes);
       setDrilldownWorkdayPct(data.workdayPercentage);
       setDrilldownTitle(
-        periodType === "day"
-          ? `Detalhes do dia ${format(new Date(periodKey), "dd/MM/yyyy", { locale: ptBR })}`
-          : periodType === "month"
-            ? `Detalhes de ${format(new Date(`${month.year}-${String(month.month).padStart(2, "0")}-01`), "MMMM 'de' yyyy", { locale: ptBR })}`
-            : `Detalhes de ${format(new Date(periodKey), "dd/MM/yyyy", { locale: ptBR })}`,
+        `Detalhes do dia ${format(
+          new Date(drilldownInput.date ?? new Date().toISOString()),
+          "dd/MM/yyyy",
+          { locale: ptBR },
+        )}`,
       );
       setDrilldownOpen(true);
     } catch (error) {
@@ -159,11 +146,7 @@ export function DashboardContent() {
   };
 
   const handleCsvExport = async () => {
-    const params = new URLSearchParams(buildQueryParams());
-    const res = await fetch(`/api/trpc/dashboard.exportCSV?${params}`);
-    if (!res.ok) throw new Error("Erro ao exportar CSV");
-    const json = await res.json();
-    return json.result.data;
+    return utils.dashboard.exportCSV.fetch(buildInput());
   };
 
   if (loadingAggregation) {

@@ -1,4 +1,9 @@
-import { BadRequestError, ConflictError, NotFoundError } from "@/server/api";
+import {
+  BadRequestError,
+  ConflictError,
+  ForbiddenError,
+  NotFoundError,
+} from "@/server/api";
 
 import type { DriversRepository } from "./drivers.repository";
 import type {
@@ -52,8 +57,13 @@ export class DriversService {
     return driver;
   }
 
-  async listDrivers(input: ListDriversInput) {
-    return this.repository.list(input);
+  async listDrivers(input: ListDriversInput, isAdmin = false) {
+    if (!isAdmin && input.role && input.role !== "driver") {
+      throw new ForbiddenError(
+        "Apenas administradores podem listar gerentes e administradores.",
+      );
+    }
+    return this.repository.list(input, isAdmin);
   }
 
   async updateDriver(

@@ -109,7 +109,7 @@ export default function FrotaPage() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    const numericKm = parseFloat(kmPerLiter);
+    const numericKm = parseFloat(kmPerLiter.replace(',', '.'));
     if (Number.isNaN(numericKm) || numericKm <= 0) {
       toast.error("Informe um rendimento (km/L) válido e positivo.");
       return;

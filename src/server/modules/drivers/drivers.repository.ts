@@ -1,4 +1,14 @@
-import { and, count, desc, eq, isNull, sql } from "drizzle-orm";
+import {
+  and,
+  count,
+  desc,
+  eq,
+  ilike,
+  inArray,
+  isNull,
+  or,
+  sql,
+} from "drizzle-orm";
 import { auth } from "@/lib/auth";
 import type { Database } from "@/server/db";
 import { user as userTable } from "@/server/db/schemas/auth";
@@ -13,6 +23,12 @@ import type {
 
 export class DriversRepository {
   constructor(private readonly db: Database) {}
+
+  private maskDocument(encrypted: string | null): string | null {
+    if (!encrypted) return null;
+    const decrypted = decrypt(encrypted);
+    return `***.***.***-${decrypted.slice(-2)}`;
+  }
 
   async create(input: {
     name: string;
@@ -93,10 +109,26 @@ export class DriversRepository {
     return row ? this.toDomain(row) : null;
   }
 
-  async list(input: ListDriversInput) {
+  async list(input: ListDriversInput, isAdmin = false) {
+    const trimmedSearch = input.search?.trim();
+    const allowedRoles: UserRole[] = isAdmin
+      ? ["driver", "manager", "admin"]
+      : ["driver"];
+    const roleFilter =
+      input.role && allowedRoles.includes(input.role)
+        ? (input.role as UserRole)
+        : undefined;
     const where = and(
       isNull(userTable.deletedAt),
-      input.role ? eq(userTable.role, input.role) : undefined,
+      roleFilter
+        ? eq(userTable.role, roleFilter)
+        : inArray(userTable.role, [...allowedRoles]),
+      trimmedSearch
+        ? or(
+            ilike(userTable.name, `%${trimmedSearch}%`),
+            ilike(userTable.email, `%${trimmedSearch}%`),
+          )
+        : undefined,
     );
 
     const [rows, [{ total }]] = await Promise.all([
@@ -111,7 +143,7 @@ export class DriversRepository {
     ]);
 
     return {
-      drivers: rows.map(this.toDomainWithDecryptedDocument),
+      drivers: rows.map((row) => this.toDomainWithDecryptedDocument(row)),
       total,
     };
   }
@@ -169,7 +201,7 @@ export class DriversRepository {
       name: row.name,
       email: row.email,
       phone: row.phone,
-      document: row.document ? decrypt(row.document) : null,
+      document: this.maskDocument(row.document),
       role: row.role,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,

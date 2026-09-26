@@ -4,6 +4,7 @@ import {
   Car01Icon,
   ChevronsLeftRightIcon,
   DashboardSquare01Icon,
+  HistoryIcon,
   MapIcon,
   MapPinIcon,
   Settings01Icon,
@@ -42,6 +43,7 @@ const mainNav: Navlink[] = [
   { label: "Motoristas", href: "/admin/motoristas", icon: UserMultipleIcon },
   { label: "Frota", href: "/admin/frota", icon: Car01Icon },
   { label: "Pontos", href: "/admin/pontos", icon: MapPinIcon },
+  { label: "Histórico", href: "/admin/historico", icon: HistoryIcon },
 ];
 
 const configNav: Navlink[] = [
@@ -78,7 +80,11 @@ export default function AdminSidebar({ user }: { user: User }) {
               {mainNav.map((item) => (
                 <SidebarMenuItem key={item.label}>
                   <SidebarMenuButton
-                    isActive={item.href === pathname}
+                    isActive={
+                      item.href === "/admin"
+                        ? pathname === "/admin"
+                        : pathname.startsWith(item.href)
+                    }
                     tooltip={item.label}
                     render={<Link href={item.href} />}
                   >

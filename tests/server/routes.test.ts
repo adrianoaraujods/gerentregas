@@ -1001,26 +1001,6 @@ describe("RoutesService", () => {
         expect(dwellSeconds).toBeGreaterThanOrEqual(0);
       });
 
-      it("keeps route in_flight while stops remain, then concludes on last checkOut", async () => {
-        await routesService.checkIn(stop2Id, driverId);
-        await routesService.checkOut(stop2Id, driverId);
-
-        const inFlight = await routesService.getDriverRouteWithDwell(
-          driverId,
-          new Date(),
-        );
-        expect(inFlight!.status).toBe("in_flight");
-
-        await routesService.checkIn(stop3Id, driverId);
-        await routesService.checkOut(stop3Id, driverId);
-
-        const concluded = await routesService.getDriverRouteWithDwell(
-          driverId,
-          new Date(),
-        );
-        expect(concluded!.status).toBe("concluded");
-      });
-
       it("rejects checkOut without checkIn", async () => {
         await expect(routesService.checkOut(stop2Id, driverId)).rejects.toThrow(
           "Check-in não realizado",

@@ -66,7 +66,7 @@ export class RoutesService {
       );
     }
 
-    const stops = input.stops.sort((a, b) => a.order.localeCompare(b.order));
+    const stops = input.stops.sort((a, b) => Number(a.order) - Number(b.order));
     if (stops[0].order !== "1") {
       throw new BadRequestError("A primeira parada deve ter ordem '1' (RN01).");
     }
@@ -343,7 +343,7 @@ export class RoutesService {
       await this.repository.getLastConcludedStopOrder(routeId);
     if (
       lastConcludedOrder &&
-      input.order.localeCompare(lastConcludedOrder) <= 0
+      Number(input.order) <= Number(lastConcludedOrder)
     ) {
       throw new BadRequestError(
         "Não é possível inserir paradas antes ou na última parada concluída.",
@@ -360,7 +360,7 @@ export class RoutesService {
 
     const maxOrder = await this.repository.getMaxStopOrder(routeId);
     const newOrder =
-      maxOrder && input.order.localeCompare(maxOrder) > 0
+      maxOrder && Number(input.order) > Number(maxOrder)
         ? input.order
         : String(Number(maxOrder ?? 0) + 1);
 
@@ -426,7 +426,7 @@ export class RoutesService {
       await this.repository.getLastConcludedStopOrder(routeId);
     if (
       lastConcludedOrder &&
-      existingStop.order.localeCompare(lastConcludedOrder) <= 0
+      Number(existingStop.order) <= Number(lastConcludedOrder)
     ) {
       throw new BadRequestError(
         "Não é possível alterar paradas antes ou na última parada concluída.",
@@ -436,7 +436,7 @@ export class RoutesService {
     if (input.order && input.order !== existingStop.order) {
       if (
         lastConcludedOrder &&
-        input.order.localeCompare(lastConcludedOrder) <= 0
+        Number(input.order) <= Number(lastConcludedOrder)
       ) {
         throw new BadRequestError(
           "Não é possível mover parada para antes ou na última parada concluída.",
@@ -498,7 +498,12 @@ export class RoutesService {
     }
 
     await this.repository.updateStopDeparture(stopId, new Date());
-    await this.concludeRouteIfComplete(routeId);
+
+    const allStops = await this.repository.listStopsByRoute(routeId);
+    const allConcluded = allStops.every((s) => s.departureAt);
+    if (allConcluded) {
+      await this.repository.updateRoute(routeId, { status: "concluded" });
+    }
 
     const result = await this.repository.findRouteWithStops(routeId);
     if (!result) {
@@ -541,7 +546,7 @@ export class RoutesService {
       await this.repository.getLastConcludedStopOrder(routeId);
     if (
       lastConcludedOrder &&
-      existingStop.order.localeCompare(lastConcludedOrder) <= 0
+      Number(existingStop.order) <= Number(lastConcludedOrder)
     ) {
       throw new BadRequestError(
         "Não é possível excluir paradas antes ou na última parada concluída.",
@@ -852,8 +857,6 @@ export class RoutesService {
       throw new BadRequestError("Falha ao realizar check-out.");
     }
 
-    await this.concludeRouteIfComplete(route.id);
-
     const dwellSeconds = Math.floor(
       (now.getTime() - new Date(stop.arrivalAt).getTime()) / 1000,
     );
@@ -869,14 +872,6 @@ export class RoutesService {
     }));
     const distanceKmHundredths = await this.computeRouteDistance(coordinates);
     await this.repository.updateRoute(routeId, { distanceKmHundredths });
-  }
-
-  private async concludeRouteIfComplete(routeId: string): Promise<void> {
-    const allStops = await this.repository.listStopsByRoute(routeId);
-    const allConcluded = allStops.every((s) => s.departureAt);
-    if (allConcluded) {
-      await this.repository.updateRoute(routeId, { status: "concluded" });
-    }
   }
 
   private async computeRouteDistance(
