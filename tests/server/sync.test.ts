@@ -1,11 +1,16 @@
 import { eq } from "drizzle-orm";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { db } from "@/server/db";
 import { user } from "@/server/db/schemas/auth";
 import { point } from "@/server/db/schemas/points";
 import { route, stop } from "@/server/db/schemas/routes";
 import { encrypt } from "@/server/lib/crypto";
+import { FleetRepository } from "@/server/modules/fleet";
+import { ParametersRepository } from "@/server/modules/parameters";
+import type { OsrmClient } from "@/server/modules/routes/osrm";
+import { RoutesRepository } from "@/server/modules/routes/routes.repository";
+import { RoutesService } from "@/server/modules/routes/routes.service";
 import { SyncRepository } from "@/server/modules/sync/sync.repository";
 import { SyncService } from "@/server/modules/sync/sync.service";
 
@@ -417,6 +422,85 @@ describe("SyncService", () => {
 
       expect(result.rejected).toHaveLength(1);
       expect(result.rejected[0].reason).toBe("ROUTE_NOT_IN_FLIGHT");
+    });
+  });
+
+  describe("merge without version gate", () => {
+    it("manager additions keep recorded stops intact and do not reject previously queued items", async () => {
+      const routesService = new RoutesService(
+        new RoutesRepository(db),
+        new ParametersRepository(db),
+        new FleetRepository(db),
+        {
+          routeLegDistancesKm: vi.fn(async () => [5]),
+        } as unknown as OsrmClient,
+      );
+
+      const first = await service.uploadBatch(
+        {
+          items: [
+            item({
+              stopId: stopsByOrder["2"],
+              arrival: new Date(routeDate.getTime() + 30 * 60000),
+              departure: new Date(routeDate.getTime() + 45 * 60000),
+            }),
+          ],
+        },
+        driverId,
+      );
+      expect(first.accepted).toHaveLength(1);
+
+      const [extraPoint] = await db
+        .insert(point)
+        .values({
+          name: "Entrega Extra",
+          address: "Rua Nova, 42, São Paulo, SP",
+          latitude: -23.5535,
+          longitude: -46.6363,
+          geocodeStatus: "manual",
+        })
+        .returning({ id: point.id });
+
+      await routesService.addStop(
+        routeId,
+        { routeId, pointId: extraPoint.id, order: "4" },
+        managerId,
+      );
+
+      const [recorded] = await db
+        .select({
+          arrivalAt: stop.arrivalAt,
+          departureAt: stop.departureAt,
+        })
+        .from(stop)
+        .where(eq(stop.id, stopsByOrder["2"]));
+      expect(recorded.arrivalAt?.toISOString()).toBe(
+        new Date(routeDate.getTime() + 30 * 60000).toISOString(),
+      );
+      expect(recorded.departureAt?.toISOString()).toBe(
+        new Date(routeDate.getTime() + 45 * 60000).toISOString(),
+      );
+
+      const stopsAfterAddition = await db
+        .select({ order: stop.order })
+        .from(stop)
+        .where(eq(stop.routeId, routeId));
+      expect(stopsAfterAddition).toHaveLength(4);
+
+      const second = await service.uploadBatch(
+        {
+          items: [
+            item({
+              stopId: stopsByOrder["3"],
+              arrival: new Date(routeDate.getTime() + 60 * 60000),
+              departure: new Date(routeDate.getTime() + 75 * 60000),
+            }),
+          ],
+        },
+        driverId,
+      );
+      expect(second.accepted).toHaveLength(1);
+      expect(second.rejected).toHaveLength(0);
     });
   });
 });

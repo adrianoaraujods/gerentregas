@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { Figtree, JetBrains_Mono, Montserrat } from "next/font/google";
 import type { ReactNode } from "react";
 import { Providers } from "@/components/providers";
+import { ServiceWorkerRegistrar } from "@/components/service-worker-registrar";
 import { cn } from "@/lib/utils";
 
 const montserrat = Montserrat({ subsets: ["latin"], variable: "--font-sans" });
@@ -25,6 +26,12 @@ const monoFontFamily = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: "Gerentregas",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Gerentregas",
+  },
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
@@ -42,6 +49,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     >
       <body className="min-h-svh flex flex-col text-foreground bg-background">
         <Providers>{children}</Providers>
+        <ServiceWorkerRegistrar />
       </body>
     </html>
   );

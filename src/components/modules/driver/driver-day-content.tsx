@@ -2,15 +2,20 @@
 
 import { format } from "date-fns";
 import {
+  AlertTriangle,
   CheckCircle2,
+  Clock,
   Flag,
   LogIn,
   LogOut,
   Play,
+  RefreshCw,
   Timer,
+  Trash2,
   Truck,
+  WifiOff,
 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -31,6 +36,8 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api/client";
+import type { QueuedStopEvent } from "@/lib/sync/sync-client";
+import { useSyncQueue } from "@/lib/sync/use-sync-queue";
 import type { RouterOutputs } from "@/server/api/router";
 import type { RouteStatus } from "@/server/modules/routes";
 
@@ -92,6 +99,25 @@ export function DriverDayContent({ driverName }: { driverName: string }) {
   );
 
   const utils = api.useUtils();
+  const {
+    isOnline,
+    isSyncing,
+    queue,
+    pendingCount,
+    recordArrival,
+    recordDeparture,
+    flush,
+    retry,
+    dismiss,
+  } = useSyncQueue();
+
+  const queuedByStopId = useMemo(() => {
+    const map = new Map<string, QueuedStopEvent>();
+    for (const event of queue) {
+      map.set(event.stopId, event);
+    }
+    return map;
+  }, [queue]);
 
   const { data: route, isLoading: isLoadingRoute } =
     api.routes.getMyRouteWithDwell.useQuery({});
@@ -134,6 +160,39 @@ export function DriverDayContent({ driverName }: { driverName: string }) {
       toast.error(error.message || "Erro ao registrar a saída");
     },
   });
+
+  const handleCheckIn = (stopId: string) => {
+    if (isOnline) {
+      checkInMutation.mutate({ stopId });
+      return;
+    }
+    recordArrival(stopId)
+      .then(() =>
+        toast.success(
+          "Sem conexão: chegada salva na fila e marcada como pendente.",
+        ),
+      )
+      .catch((error) => toast.error(error.message));
+  };
+
+  const handleCheckOut = (stopId: string) => {
+    const queued = queuedByStopId.get(stopId);
+    if (isOnline && !queued) {
+      checkOutMutation.mutate({ stopId });
+      return;
+    }
+    recordDeparture(stopId)
+      .then(() => {
+        if (isOnline) {
+          toast.success("Saída registrada. Sincronizando com o servidor...");
+          return flush();
+        }
+        toast.success(
+          "Sem conexão: saída salva na fila e marcada como pendente.",
+        );
+      })
+      .catch((error) => toast.error(error.message));
+  };
 
   if (isLoadingRoute) {
     return (
@@ -197,7 +256,34 @@ export function DriverDayContent({ driverName }: { driverName: string }) {
                 {routeDate ? ` — ${format(routeDate, "dd/MM/yyyy")}` : ""}
               </CardDescription>
             </div>
-            <Badge variant={dayState.variant}>{dayState.label}</Badge>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant={dayState.variant}>{dayState.label}</Badge>
+              {!isOnline && (
+                <Badge variant="secondary">
+                  <WifiOff className="size-3" />
+                  Offline
+                </Badge>
+              )}
+              {pendingCount > 0 && (
+                <Badge variant="outline">
+                  <Clock className="size-3" />
+                  {pendingCount === 1
+                    ? "1 registro pendente"
+                    : `${pendingCount} registros pendentes`}
+                </Badge>
+              )}
+              {pendingCount > 0 && isOnline && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => flush()}
+                  disabled={isSyncing}
+                >
+                  <RefreshCw className="size-4" />
+                  {isSyncing ? "Sincronizando..." : "Sincronizar agora"}
+                </Button>
+              )}
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -281,9 +367,20 @@ export function DriverDayContent({ driverName }: { driverName: string }) {
       <div className="space-y-3">
         {route.stops.map((stop) => {
           const origin = isOrigin(stop);
-          const arrival = formatTime(stop.arrivalAt);
-          const departure = formatTime(stop.departureAt);
-          const dwell = origin ? null : formatDwell(stop.dwellSeconds);
+          const queued = queuedByStopId.get(stop.id);
+          const stopPending = queued?.status === "pending";
+          const stopRejected = queued?.status === "rejected" ? queued : null;
+          const arrival = formatTime(queued?.arrival ?? stop.arrivalAt);
+          const departure = formatTime(queued?.departure ?? stop.departureAt);
+          const queuedDwellSeconds =
+            stopPending && queued?.arrival && queued?.departure
+              ? (new Date(queued.departure).getTime() -
+                  new Date(queued.arrival).getTime()) /
+                1000
+              : undefined;
+          const dwell = origin
+            ? null
+            : formatDwell(queuedDwellSeconds ?? stop.dwellSeconds);
           const isInFlight = route.status === "in_flight";
 
           return (
@@ -297,6 +394,18 @@ export function DriverDayContent({ driverName }: { driverName: string }) {
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="font-medium">{stopTitle(stop)}</p>
                       {origin && <Badge variant="outline">Origem</Badge>}
+                      {stopPending && (
+                        <Badge variant="outline">
+                          <Clock className="size-3" />
+                          pendente
+                        </Badge>
+                      )}
+                      {stopRejected && (
+                        <Badge variant="destructive">
+                          <AlertTriangle className="size-3" />
+                          rejeitada
+                        </Badge>
+                      )}
                       {!origin && departure && dwell && (
                         <Badge variant="secondary">
                           <Timer className="size-3" />
@@ -315,14 +424,45 @@ export function DriverDayContent({ driverName }: { driverName: string }) {
                             : "Aguardando início do turno"}
                         </span>
                       )}
-                      {!origin && arrival && <span>Chegada às {arrival}</span>}
+                      {!origin && arrival && (
+                        <span>
+                          Chegada às {arrival}
+                          {stopPending ? " (pendente)" : ""}
+                        </span>
+                      )}
                       {!origin && departure && (
-                        <span>Saída às {departure}</span>
+                        <span>
+                          Saída às {departure}
+                          {stopPending ? " (pendente)" : ""}
+                        </span>
                       )}
                       {!origin && !arrival && !departure && (
                         <span>Aguardando chegada</span>
                       )}
                     </div>
+                    {stopRejected && (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-xs text-destructive">
+                          {stopRejected.message}
+                        </p>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => retry(stopRejected.id)}
+                        >
+                          <RefreshCw className="size-4" />
+                          Tentar novamente
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => dismiss(stopRejected.id)}
+                        >
+                          <Trash2 className="size-4" />
+                          Remover
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -331,10 +471,10 @@ export function DriverDayContent({ driverName }: { driverName: string }) {
                     {!arrival && !departure && (
                       <Button
                         size="sm"
-                        disabled={!isInFlight || checkInMutation.isPending}
-                        onClick={() =>
-                          checkInMutation.mutate({ stopId: stop.id })
+                        disabled={
+                          !isInFlight || (isOnline && checkInMutation.isPending)
                         }
+                        onClick={() => handleCheckIn(stop.id)}
                       >
                         <LogIn className="size-4" />
                         Registrar chegada
@@ -343,10 +483,11 @@ export function DriverDayContent({ driverName }: { driverName: string }) {
                     {arrival && !departure && (
                       <Button
                         size="sm"
-                        disabled={!isInFlight || checkOutMutation.isPending}
-                        onClick={() =>
-                          checkOutMutation.mutate({ stopId: stop.id })
+                        disabled={
+                          !isInFlight ||
+                          (isOnline && !queued && checkOutMutation.isPending)
                         }
+                        onClick={() => handleCheckOut(stop.id)}
                       >
                         <LogOut className="size-4" />
                         Registrar saída
@@ -355,7 +496,7 @@ export function DriverDayContent({ driverName }: { driverName: string }) {
                     {departure && (
                       <span className="inline-flex items-center gap-2 text-sm text-muted-foreground">
                         <CheckCircle2 className="size-4" />
-                        Concluída
+                        {stopPending ? "Concluída (pendente)" : "Concluída"}
                       </span>
                     )}
                   </div>
