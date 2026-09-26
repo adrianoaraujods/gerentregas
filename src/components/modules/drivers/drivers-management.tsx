@@ -11,6 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { DebounceInput } from "@/components/ui/debounce-input";
 import {
   Dialog,
   DialogContent,
@@ -19,7 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { DebounceInput, Input } from "@/components/ui/input";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Table,
@@ -222,14 +223,10 @@ export function DriversManagement({ isAdmin }: { isAdmin: boolean }) {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
-            <CardTitle render={<h1>Motoristas e usuários</h1>} />
-            <CardDescription
-              render={
-                <h2>
-                  Cadastre e gerencie motoristas, gerentes e coordenadores.
-                </h2>
-              }
-            />
+            <CardTitle>Motoristas e usuários</CardTitle>
+            <CardDescription>
+              Cadastre e gerencie motoristas, gerentes e coordenadores.
+            </CardDescription>
           </div>
           <Button onClick={openCreateModal}>+ Novo {singular}</Button>
         </CardHeader>

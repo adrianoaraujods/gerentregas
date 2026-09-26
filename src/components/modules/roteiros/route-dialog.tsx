@@ -143,7 +143,10 @@ export function RouteDialog({
         driverId,
         date: new Date(date).toISOString(),
         vehicleId: vehicleId || null,
-        stops: stops.map((s, i) => ({ pointId: s.pointId, order: String(i + 1) })),
+        stops: stops.map((s, i) => ({
+          pointId: s.pointId,
+          order: String(i + 1),
+        })),
       });
     } else {
       updateRouteMutation.mutate({
@@ -230,10 +233,16 @@ export function RouteDialog({
                     <SelectValue placeholder="Selecione um veículo..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="" label="Nenhum (Indeterminado)">Nenhum (Indeterminado)</SelectItem>
+                    <SelectItem value="" label="Nenhum (Indeterminado)">
+                      Nenhum (Indeterminado)
+                    </SelectItem>
                     {vehicles?.map(
                       (v: { id: string; plate: string; model: string }) => (
-                        <SelectItem key={v.id} value={v.id} label={`${v.plate} - ${v.model}`}>
+                        <SelectItem
+                          key={v.id}
+                          value={v.id}
+                          label={`${v.plate} - ${v.model}`}
+                        >
                           {v.plate} - {v.model}
                         </SelectItem>
                       ),
@@ -283,7 +292,11 @@ export function RouteDialog({
                               name: string;
                               address: string;
                             }) => (
-                              <SelectItem key={p.id} value={p.id} label={`${p.name} - ${p.address}`}>
+                              <SelectItem
+                                key={p.id}
+                                value={p.id}
+                                label={`${p.name} - ${p.address}`}
+                              >
                                 {p.name} - {p.address}
                               </SelectItem>
                             ),

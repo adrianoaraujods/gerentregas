@@ -93,14 +93,14 @@ export function PointDialog({
     let lngNum: number | undefined;
 
     if (latitude.trim()) {
-      latNum = parseFloat(latitude.replace(',', '.'));
+      latNum = parseFloat(latitude.replace(",", "."));
       if (Number.isNaN(latNum) || latNum < -90 || latNum > 90) {
         newErrors.latitude = "Latitude inválida (-90 a 90)";
       }
     }
 
     if (longitude.trim()) {
-      lngNum = parseFloat(longitude.replace(',', '.'));
+      lngNum = parseFloat(longitude.replace(",", "."));
       if (Number.isNaN(lngNum) || lngNum < -180 || lngNum > 180) {
         newErrors.longitude = "Longitude inválida (-180 a 180)";
       }
@@ -146,7 +146,9 @@ export function PointDialog({
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Ex: CD Sul"
               />
-              <FieldError errors={errors.name} />
+              <FieldError
+                errors={errors.name ? [{ message: errors.name }] : undefined}
+              />
             </FieldContent>
           </Field>
 
@@ -163,7 +165,11 @@ export function PointDialog({
                 O endereço será convertido em coordenadas automaticamente. Se
                 falhar, você poderá inseri-las manualmente.
               </p>
-              <FieldError errors={errors.address} />
+              <FieldError
+                errors={
+                  errors.address ? [{ message: errors.address }] : undefined
+                }
+              />
             </FieldContent>
           </Field>
 
@@ -182,7 +188,13 @@ export function PointDialog({
                     onChange={(e) => setLatitude(e.target.value)}
                     placeholder="Ex: -23.550520"
                   />
-                  <FieldError errors={errors.latitude} />
+                  <FieldError
+                    errors={
+                      errors.latitude
+                        ? [{ message: errors.latitude }]
+                        : undefined
+                    }
+                  />
                 </FieldContent>
               </Field>
 
@@ -197,7 +209,13 @@ export function PointDialog({
                     onChange={(e) => setLongitude(e.target.value)}
                     placeholder="Ex: -46.633308"
                   />
-                  <FieldError errors={errors.longitude} />
+                  <FieldError
+                    errors={
+                      errors.longitude
+                        ? [{ message: errors.longitude }]
+                        : undefined
+                    }
+                  />
                 </FieldContent>
               </Field>
             </div>

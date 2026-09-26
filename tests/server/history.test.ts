@@ -4,8 +4,10 @@ import { db } from "@/server/db";
 import { user } from "@/server/db/schemas/auth";
 import { FleetRepository } from "@/server/modules/fleet";
 import { ParametersRepository } from "@/server/modules/parameters";
+import type { GeocodeResult } from "@/server/modules/points/geocoder";
 import { PointsRepository } from "@/server/modules/points/points.repository";
 import { PointsService } from "@/server/modules/points/points.service";
+import type { OsrmClient } from "@/server/modules/routes/osrm";
 import { RoutesRepository } from "@/server/modules/routes/routes.repository";
 import { RoutesService } from "@/server/modules/routes/routes.service";
 
@@ -15,7 +17,7 @@ describe("History and Corrections", () => {
   let parametersRepository: ParametersRepository;
   let fleetRepository: FleetRepository;
   let mockGeocoder: { geocode: ReturnType<typeof vi.fn> };
-  let mockOsrm: any;
+  let mockOsrm: { routeLegDistancesKm: ReturnType<typeof vi.fn> };
   let pointsService: PointsService;
   let routesService: RoutesService;
 
@@ -30,16 +32,21 @@ describe("History and Corrections", () => {
     pointsRepository = new PointsRepository(db);
     parametersRepository = new ParametersRepository(db);
     fleetRepository = new FleetRepository(db);
-    mockGeocoder = { geocode: vi.fn() as any };
+    mockGeocoder = { geocode: vi.fn() };
     mockOsrm = {
       routeLegDistancesKm: vi.fn(async () => [5, 7]),
     };
-    pointsService = new PointsService(pointsRepository, mockGeocoder as any);
+    pointsService = new PointsService(
+      pointsRepository,
+      mockGeocoder as unknown as {
+        geocode: (address: string) => Promise<GeocodeResult | null>;
+      },
+    );
     routesService = new RoutesService(
       routesRepository,
       parametersRepository,
       fleetRepository,
-      mockOsrm,
+      mockOsrm as unknown as OsrmClient,
     );
 
     const [mgr] = await db
