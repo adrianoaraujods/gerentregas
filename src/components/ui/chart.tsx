@@ -85,11 +85,13 @@ const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
     ([, config]) => config.theme ?? config.color,
   );
 
-  const cssContent = React.useMemo(() => {
-    if (!colorConfig.length) return "";
-    return Object.entries(THEMES)
-      .map(
-        ([theme, prefix]) => `
+  if (!colorConfig.length) {
+    return null;
+  }
+
+  const css = Object.entries(THEMES)
+    .map(
+      ([theme, prefix]) => `
 ${prefix} [data-chart=${id}] {
 ${colorConfig
   .map(([key, itemConfig]) => {
@@ -101,23 +103,10 @@ ${colorConfig
   .join("\n")}
 }
 `,
-      )
-      .join("\n");
-  }, [id, colorConfig]);
+    )
+    .join("\n");
 
-  const styleRef = React.useRef<HTMLStyleElement>(null);
-
-  React.useLayoutEffect(() => {
-    if (styleRef.current && cssContent) {
-      styleRef.current.textContent = cssContent;
-    }
-  }, [cssContent]);
-
-  if (!colorConfig.length) {
-    return null;
-  }
-
-  return <style ref={styleRef} />;
+  return <style>{css}</style>;
 };
 
 const ChartTooltip = RechartsPrimitive.Tooltip;
@@ -212,7 +201,7 @@ function ChartTooltipContent({
 
             return (
               <div
-                key={key}
+                key={`${item.name ?? item.dataKey ?? "value"}`}
                 className={cn(
                   "flex w-full flex-wrap items-stretch gap-2 [&>svg]:h-2.5 [&>svg]:w-2.5 [&>svg]:text-muted-foreground",
                   indicator === "dot" && "items-center",
@@ -304,13 +293,13 @@ function ChartLegendContent({
     >
       {payload
         .filter((item) => item.type !== "none")
-        .map((item, _index) => {
+        .map((item) => {
           const key = `${nameKey ?? item.dataKey ?? "value"}`;
           const itemConfig = getPayloadConfigFromPayload(config, item, key);
 
           return (
             <div
-              key={key}
+              key={`${item.dataKey ?? item.value ?? "value"}`}
               className={cn(
                 "flex items-center gap-1.5 [&>svg]:h-3 [&>svg]:w-3 [&>svg]:text-muted-foreground",
               )}

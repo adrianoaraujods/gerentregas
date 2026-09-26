@@ -72,15 +72,11 @@ export function ResetPasswordForm({ token }: { token?: string }) {
     return (
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle render={<h1>Link inválido</h1>} />
-          <CardDescription
-            render={
-              <h2>
-                Este link de recuperação é inválido ou expirou. Solicite um novo
-                link.
-              </h2>
-            }
-          />
+          <CardTitle>Link inválido</CardTitle>
+          <CardDescription>
+            Este link de recuperação é inválido ou expirou. Solicite um novo
+            link.
+          </CardDescription>
         </CardHeader>
         <CardFooter>
           <Button
@@ -96,101 +92,92 @@ export function ResetPasswordForm({ token }: { token?: string }) {
 
   return (
     <form.AppForm>
-      <Card
-        className="w-full max-w-md"
-        render={
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              form.handleSubmit();
-            }}
-          >
-            <CardHeader>
-              <CardTitle render={<h1>Defina uma nova senha</h1>} />
-              <CardDescription
-                render={<h2>Escolha uma nova senha para sua conta.</h2>}
-              />
-            </CardHeader>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          form.handleSubmit();
+        }}
+      >
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle>Defina uma nova senha</CardTitle>
+            <CardDescription>
+              Escolha uma nova senha para sua conta.
+            </CardDescription>
+          </CardHeader>
 
-            <CardContent
-              render={
-                <FieldGroup>
-                  <form.AppField name="password">
-                    {(field) => (
-                      <field.TextField
-                        label="Nova senha"
-                        props={{
-                          type: showPassword ? "text" : "password",
-                          placeholder: "••••••••",
-                        }}
-                        suffix={
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="hover:bg-transparent hover:text-primary-hover"
-                            onClick={() => setShowPassword((prev) => !prev)}
-                            aria-label={
-                              showPassword ? "Esconder senha" : "Mostrar senha"
-                            }
-                          >
-                            {showPassword ? (
-                              <HugeiconsIcon icon={EyeOffIcon} />
-                            ) : (
-                              <HugeiconsIcon icon={EyeIcon} />
-                            )}
-                          </Button>
+          <CardContent>
+            <FieldGroup>
+              <form.AppField name="password">
+                {(field) => (
+                  <field.TextField
+                    label="Nova senha"
+                    props={{
+                      type: showPassword ? "text" : "password",
+                      placeholder: "••••••••",
+                    }}
+                    suffix={
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setShowPassword((prev) => !prev)}
+                        aria-label={
+                          showPassword ? "Esconder senha" : "Mostrar senha"
                         }
-                      />
-                    )}
-                  </form.AppField>
+                      >
+                        {showPassword ? (
+                          <HugeiconsIcon icon={EyeOffIcon} />
+                        ) : (
+                          <HugeiconsIcon icon={EyeIcon} />
+                        )}
+                      </Button>
+                    }
+                  />
+                )}
+              </form.AppField>
 
-                  <form.AppField name="confirmPassword">
-                    {(field) => (
-                      <field.TextField
-                        label="Confirmar nova senha"
-                        props={{
-                          type: showConfirmPassword ? "text" : "password",
-                          placeholder: "••••••••",
-                        }}
-                        suffix={
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="hover:bg-transparent hover:text-primary-hover"
-                            onClick={() =>
-                              setShowConfirmPassword((prev) => !prev)
-                            }
-                            aria-label={
-                              showConfirmPassword
-                                ? "Esconder senha"
-                                : "Mostrar senha"
-                            }
-                          >
-                            {showConfirmPassword ? (
-                              <HugeiconsIcon icon={EyeOffIcon} />
-                            ) : (
-                              <HugeiconsIcon icon={EyeIcon} />
-                            )}
-                          </Button>
+              <form.AppField name="confirmPassword">
+                {(field) => (
+                  <field.TextField
+                    label="Confirmar nova senha"
+                    props={{
+                      type: showConfirmPassword ? "text" : "password",
+                      placeholder: "••••••••",
+                    }}
+                    suffix={
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setShowConfirmPassword((prev) => !prev)}
+                        aria-label={
+                          showConfirmPassword
+                            ? "Esconder senha"
+                            : "Mostrar senha"
                         }
-                      />
-                    )}
-                  </form.AppField>
+                      >
+                        {showConfirmPassword ? (
+                          <HugeiconsIcon icon={EyeOffIcon} />
+                        ) : (
+                          <HugeiconsIcon icon={EyeIcon} />
+                        )}
+                      </Button>
+                    }
+                  />
+                )}
+              </form.AppField>
 
-                  <form.FormError />
-                </FieldGroup>
-              }
-            />
+              <form.FormError />
+            </FieldGroup>
+          </CardContent>
 
-            <CardFooter>
-              <form.SubmitButton>Salvar nova senha</form.SubmitButton>
-            </CardFooter>
-          </form>
-        }
-      />
+          <CardFooter>
+            <form.SubmitButton>Salvar nova senha</form.SubmitButton>
+          </CardFooter>
+        </Card>
+      </form>
     </form.AppForm>
   );
 }

@@ -22,7 +22,7 @@ export default function PagesLayout({ children }: { children: ReactNode }) {
       <Navbar>
         <NavbarContent>
           <Link href="/">
-            <GerentregasLogo className="duration-200 hover:text-primary-hover" />
+            <GerentregasLogo className="duration-200" />
           </Link>
 
           <Suspense>

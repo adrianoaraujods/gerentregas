@@ -57,14 +57,18 @@ export function DayTimelineChart({
 
   const chartData = stops
     .filter((s) => s.dwellMinutes > 0)
-    .map((stop, index) => ({
-      ...stop,
-      index,
-      x: stop.startHour,
-      width: Math.max(stop.dwellHours, 0.25),
-      name: stop.pointName,
-      color: `hsl(var(--chart-${(index % 5) + 1}))`,
-    }));
+    .map((stop, index) => {
+      const minDuration = 0.25; // min 15 minutes for visibility
+      const endHour = stop.startHour + Math.max(stop.dwellHours, minDuration);
+
+      return {
+        ...stop,
+        index,
+        timeRange: [stop.startHour, Math.min(endHour, 24)], // cap at 24:00
+        name: stop.pointName,
+        color: `var(--chart-${(index % 5) + 1})`,
+      };
+    });
 
   const totalDwellMinutes = stops.reduce((sum, s) => sum + s.dwellMinutes, 0);
   const totalDwellHours = totalDwellMinutes / 60;
@@ -129,16 +133,16 @@ export function DayTimelineChart({
             horizontal={false}
             vertical
             strokeDasharray="4 4"
-            stroke="hsl(var(--border))"
+            stroke="var(--border)"
           />
           <XAxis
             type="number"
             domain={[0, HOURS_IN_DAY]}
             tickCount={HOURS_IN_DAY + 1}
             tickFormatter={(value) => `${String(value).padStart(2, "0")}:00`}
-            tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
-            axisLine={{ stroke: "hsl(var(--border))" }}
-            tickLine={{ stroke: "hsl(var(--border))" }}
+            tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+            axisLine={{ stroke: "var(--border)" }}
+            tickLine={{ stroke: "var(--border)" }}
             width={80}
           />
           <YAxis
@@ -156,8 +160,8 @@ export function DayTimelineChart({
           <Tooltip content={CustomTooltipWrapper} />
           <Legend />
           <BarWrapper
-            dataKey="width"
-            radius={[0, 4, 4, 0]}
+            dataKey="timeRange"
+            radius={[4, 4, 4, 4]}
             minPointSize={0}
             shape={(
               props: BarShapeProps & {
@@ -206,7 +210,7 @@ export function DayTimelineChart({
             {chartData.map((stop) => (
               <Cell
                 key={stop.stopId}
-                fill={`hsl(var(--chart-${(chartData.indexOf(stop) % 5) + 1}))`}
+                fill={`var(--chart-${(chartData.indexOf(stop) % 5) + 1})`}
               />
             ))}
           </BarWrapper>
@@ -224,12 +228,12 @@ export function DayTimelineChart({
               onStopClick && "cursor-pointer hover:bg-accent",
             )}
             onClick={() => onStopClick?.(stop)}
-            style={{ borderColor: `hsl(var(--chart-${(index % 5) + 1}))` }}
+            style={{ borderColor: `var(--chart-${(index % 5) + 1})` }}
           >
             <span
               className="w-2 h-2 rounded"
               style={{
-                backgroundColor: `hsl(var(--chart-${(index % 5) + 1}))`,
+                backgroundColor: `var(--chart-${(index % 5) + 1})`,
               }}
             />
             {stop.pointName} ({stop.dwellMinutes} min)

@@ -156,15 +156,11 @@ export function DriverDayContent({ driverName }: { driverName: string }) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle render={<h2>Roteiro do dia</h2>} />
-          <CardDescription
-            render={
-              <p>
-                Olá, {driverName}. Não há roteiro atribuído para você hoje. Fale
-                com o gerente caso isso esteja errado.
-              </p>
-            }
-          />
+          <CardTitle>Roteiro do dia</CardTitle>
+          <CardDescription>
+            Olá, {driverName}. Não há roteiro atribuído para você hoje. Fale com
+            o gerente caso isso esteja errado.
+          </CardDescription>
         </CardHeader>
       </Card>
     );
@@ -195,15 +191,11 @@ export function DriverDayContent({ driverName }: { driverName: string }) {
         <CardHeader>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <CardTitle render={<h2>Roteiro de hoje</h2>} />
-              <CardDescription
-                render={
-                  <p>
-                    {driverName}
-                    {routeDate ? ` — ${format(routeDate, "dd/MM/yyyy")}` : ""}
-                  </p>
-                }
-              />
+              <CardTitle>Roteiro de hoje</CardTitle>
+              <CardDescription>
+                {driverName}
+                {routeDate ? ` — ${format(routeDate, "dd/MM/yyyy")}` : ""}
+              </CardDescription>
             </div>
             <Badge variant={dayState.variant}>{dayState.label}</Badge>
           </div>
@@ -298,7 +290,7 @@ export function DriverDayContent({ driverName }: { driverName: string }) {
             <Card key={stop.id}>
               <CardContent className="flex flex-col gap-3 py-1 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-start gap-3">
-                  <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-secondary font-head text-sm font-medium">
+                  <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-secondary font-heading text-sm font-medium">
                     {stop.order}
                   </span>
                   <div className="space-y-1">

@@ -15,7 +15,7 @@ export default function AuthPagesLayout({ children }: { children: ReactNode }) {
       <Navbar>
         <NavbarContent>
           <Link href="/">
-            <GerentregasLogo className="duration-200 hover:text-primary-hover" />
+            <GerentregasLogo className="duration-200" />
           </Link>
         </NavbarContent>
       </Navbar>

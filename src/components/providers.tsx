@@ -4,8 +4,8 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { httpBatchLink } from "@trpc/client";
 import { ThemeProvider } from "next-themes";
 import React from "react";
-import { Toaster } from "sonner";
 
+import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { api } from "@/lib/api/client";
 import { THEMES } from "@/lib/config";
@@ -46,7 +46,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
         >
           <TooltipProvider>
             {children}
-            <Toaster richColors />
+            <Toaster />
           </TooltipProvider>
         </ThemeProvider>
       </QueryClientProvider>

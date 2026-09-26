@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { MoneyField } from "@/components/fields/money-field";
+import { NumberField } from "@/components/fields/number-field";
 import { useAppForm } from "@/components/hooks/use-app-form";
 import {
   Card,
@@ -35,7 +37,10 @@ export default function ConfiguracoesPage() {
     },
     onSubmit: async ({ value }) => {
       setIsLoading(true);
-      updateMutation.mutate(value);
+      updateMutation.mutate({
+        fuelPricePerLiter: Number(value.fuelPricePerLiter),
+        standardWorkdayDuration: Number(value.standardWorkdayDuration),
+      });
     },
   });
 
@@ -67,77 +72,60 @@ export default function ConfiguracoesPage() {
 
   return (
     <form.AppForm>
-      <Card
-        className="max-w-md"
-        render={
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              form.handleSubmit();
-            }}
-          >
-            <CardHeader>
-              <CardTitle render={<h1>Configurações</h1>} />
-              <CardDescription
-                render={
-                  <h2>
-                    Gerencie os parâmetros do sistema utilizados nos cálculos de
-                    custo.
-                  </h2>
-                }
-              />
-            </CardHeader>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          form.handleSubmit();
+        }}
+      >
+        <Card className="max-w-md">
+          <CardHeader>
+            <CardTitle>Configurações</CardTitle>
+            <CardDescription>
+              Gerencie os parâmetros do sistema utilizados nos cálculos de
+              custo.
+            </CardDescription>
+          </CardHeader>
 
-            <CardContent
-              render={
-                <FieldGroup>
-                  <form.AppField name="fuelPricePerLiter">
-                    {(field) => (
-                      <field.TextField
-                        label="Preço do combustível (R$/L)"
-                        props={{
-                          type: "number",
-                          step: "0.01",
-                          min: "0.01",
-                          placeholder: "6.00",
-                          disabled: isLoading,
-                        }}
-                      />
-                    )}
-                  </form.AppField>
+          <CardContent>
+            <FieldGroup>
+              <form.AppField name="fuelPricePerLiter">
+                {() => (
+                  <MoneyField
+                    label="Preço do combustível (R$/L)"
+                    props={{
+                      disabled: isLoading,
+                      placeholder: "0,00",
+                    }}
+                  />
+                )}
+              </form.AppField>
 
-                  <form.AppField name="standardWorkdayDuration">
-                    {(field) => (
-                      <field.TextField
-                        label="Jornada padrão (minutos)"
-                        props={{
-                          type: "number",
-                          step: "1",
-                          min: "1",
-                          placeholder: "480",
-                          disabled: isLoading,
-                        }}
-                      />
-                    )}
-                  </form.AppField>
+              <form.AppField name="standardWorkdayDuration">
+                {() => (
+                  <NumberField
+                    label="Jornada padrão (minutos)"
+                    props={{
+                      min: "1",
+                      placeholder: "480",
+                      disabled: isLoading,
+                    }}
+                  />
+                )}
+              </form.AppField>
 
-                  <form.FormError />
-                </FieldGroup>
-              }
-            />
+              <form.FormError />
+            </FieldGroup>
+          </CardContent>
 
-            <CardFooter
-              className="flex-col space-y-4"
-              render={
-                <form.SubmitButton disabled={isLoading}>
-                  {isLoading ? "Salvando..." : "Salvar alterações"}
-                </form.SubmitButton>
-              }
-            />
-          </form>
-        }
-      />
+          <CardFooter className="flex-col space-y-4">
+            <form.SubmitButton disabled={isLoading}>
+              {isLoading ? "Salvando..." : "Salvar alterações"}
+            </form.SubmitButton>
+          </CardFooter>
+        </Card>
+      </form>
     </form.AppForm>
   );
 }

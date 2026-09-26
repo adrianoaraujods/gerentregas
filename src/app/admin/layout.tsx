@@ -28,7 +28,7 @@ export default async function AdminLayout({
       <AdminSidebar user={session.user as User} />
 
       <SidebarInset>
-        <header className="flex h-(--navbar-height) items-center border-b-2 px-4">
+        <header className="flex h-(--navbar-height) items-center border-b px-4">
           <SidebarTrigger className="-ml-1" />
         </header>
 

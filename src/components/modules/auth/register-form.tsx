@@ -66,134 +66,126 @@ export function RegisterForm() {
 
   return (
     <form.AppForm>
-      <Card
+      <form
         className="w-full max-w-md"
-        render={
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              form.handleSubmit();
-            }}
-          >
-            <CardHeader>
-              <CardTitle render={<h1>Crie sua conta!</h1>} />
-              <CardDescription
-                render={
-                  <h2>Preencha com seus dados abaixo para se cadastrar</h2>
-                }
+        onSubmit={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          form.handleSubmit();
+        }}
+      >
+        <Card>
+          <CardHeader>
+            <CardTitle>Crie sua conta!</CardTitle>
+            <CardDescription>
+              Preencha com seus dados abaixo para se cadastrar
+            </CardDescription>
+          </CardHeader>
+
+          <CardContent>
+            <FieldGroup>
+              <form.AppField name="name">
+                {(field) => (
+                  <field.TextField
+                    label="Nome"
+                    props={{ placeholder: "João da Silva" }}
+                  />
+                )}
+              </form.AppField>
+
+              <form.AppField name="email">
+                {(field) => (
+                  <field.TextField
+                    label="E-mail"
+                    props={{
+                      type: "email",
+                      placeholder: "joao.silva@email.com",
+                    }}
+                  />
+                )}
+              </form.AppField>
+
+              <form.AppField name="password">
+                {(field) => (
+                  <field.TextField
+                    label="Senha"
+                    props={{
+                      type: showPassword ? "text" : "password",
+                      placeholder: "••••••••",
+                    }}
+                    suffix={
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className="-mr-1"
+                        size="icon"
+                        onClick={() => setShowPassword((prev) => !prev)}
+                        aria-label={
+                          showPassword ? "Esconder senha" : "Mostrar senha"
+                        }
+                      >
+                        {showPassword ? (
+                          <HugeiconsIcon icon={EyeOffIcon} />
+                        ) : (
+                          <HugeiconsIcon icon={EyeIcon} />
+                        )}
+                      </Button>
+                    }
+                  />
+                )}
+              </form.AppField>
+
+              <form.AppField name="confirmPassword">
+                {(field) => (
+                  <field.TextField
+                    label="Confirmar senha"
+                    props={{
+                      type: showConfirmPassword ? "text" : "password",
+                      placeholder: "••••••••",
+                    }}
+                    suffix={
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className="-mr-1"
+                        size="icon"
+                        onClick={() => setShowConfirmPassword((prev) => !prev)}
+                        aria-label={
+                          showConfirmPassword
+                            ? "Esconder senha"
+                            : "Mostrar senha"
+                        }
+                      >
+                        {showConfirmPassword ? (
+                          <HugeiconsIcon icon={EyeOffIcon} />
+                        ) : (
+                          <HugeiconsIcon icon={EyeIcon} />
+                        )}
+                      </Button>
+                    }
+                  />
+                )}
+              </form.AppField>
+
+              <form.FormError />
+            </FieldGroup>
+          </CardContent>
+
+          <CardFooter className="flex-col space-y-4">
+            <form.SubmitButton>Cadastrar</form.SubmitButton>
+
+            <span>
+              Já tem uma conta?{" "}
+              <Button
+                className="px-2"
+                variant="link"
+                nativeButton={false}
+                render={<Link href="/entrar">Entre aqui</Link>}
               />
-            </CardHeader>
-
-            <CardContent
-              render={
-                <FieldGroup>
-                  <form.AppField name="name">
-                    {(field) => (
-                      <field.TextField
-                        label="Nome"
-                        props={{ placeholder: "João da Silva" }}
-                      />
-                    )}
-                  </form.AppField>
-
-                  <form.AppField name="email">
-                    {(field) => (
-                      <field.TextField
-                        label="E-mail"
-                        props={{
-                          type: "email",
-                          placeholder: "joao.silva@email.com",
-                        }}
-                      />
-                    )}
-                  </form.AppField>
-
-                  <form.AppField name="password">
-                    {(field) => (
-                      <field.TextField
-                        label="Senha"
-                        props={{
-                          type: showPassword ? "text" : "password",
-                          placeholder: "••••••••",
-                        }}
-                        suffix={
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="hover:bg-transparent hover:text-primary-hover"
-                            onClick={() => setShowPassword((prev) => !prev)}
-                            aria-label={
-                              showPassword ? "Esconder senha" : "Mostrar senha"
-                            }
-                          >
-                            {showPassword ? (
-                              <HugeiconsIcon icon={EyeOffIcon} />
-                            ) : (
-                              <HugeiconsIcon icon={EyeIcon} />
-                            )}
-                          </Button>
-                        }
-                      />
-                    )}
-                  </form.AppField>
-
-                  <form.AppField name="confirmPassword">
-                    {(field) => (
-                      <field.TextField
-                        label="Confirmar senha"
-                        props={{
-                          type: showConfirmPassword ? "text" : "password",
-                          placeholder: "••••••••",
-                        }}
-                        suffix={
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="hover:bg-transparent hover:text-primary-hover"
-                            onClick={() =>
-                              setShowConfirmPassword((prev) => !prev)
-                            }
-                            aria-label={
-                              showConfirmPassword
-                                ? "Esconder senha"
-                                : "Mostrar senha"
-                            }
-                          >
-                            {showConfirmPassword ? (
-                              <HugeiconsIcon icon={EyeOffIcon} />
-                            ) : (
-                              <HugeiconsIcon icon={EyeIcon} />
-                            )}
-                          </Button>
-                        }
-                      />
-                    )}
-                  </form.AppField>
-
-                  <form.FormError />
-                </FieldGroup>
-              }
-            />
-
-            <CardFooter className="flex-col space-y-4">
-              <form.SubmitButton>Cadastrar</form.SubmitButton>
-
-              <span>
-                Já tem uma conta?{" "}
-                <Button
-                  className="px-2"
-                  variant="link"
-                  nativeButton={false}
-                  render={<Link href="/entrar">Entre aqui</Link>}
-                />
-              </span>
-            </CardFooter>
-          </form>
-        }
-      />
+            </span>
+          </CardFooter>
+        </Card>
+      </form>
     </form.AppForm>
   );
 }

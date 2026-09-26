@@ -103,7 +103,7 @@ function Navbar({
     props: {
       className: cn(
         sectionVariants({ variant, maxWidth }),
-        "sticky top-0 p-0 z-30 flex h-(--navbar-height) gap-4 border-b-2 bg-sidebar px-4 text-sidebar-foreground",
+        "sticky top-0 p-0 z-30 flex h-(--navbar-height) gap-4 border-b bg-sidebar px-4 text-sidebar-foreground",
         className,
       ),
       "data-slot": "navbar",
@@ -144,7 +144,6 @@ function NavbarLinks({
       {links.map(({ href, label }) => (
         <li key={href}>
           <Button
-            className="hover:bg-transparent hover:text-primary-hover"
             variant="ghost"
             render={<Link href={href}>{label}</Link>}
             nativeButton={false}

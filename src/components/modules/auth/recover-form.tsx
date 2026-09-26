@@ -44,73 +44,64 @@ export function RecoverForm() {
 
   return (
     <form.AppForm>
-      <Card
+      <form
         className="w-full max-w-md"
-        render={
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              form.handleSubmit();
-            }}
-          >
-            <CardHeader>
-              <CardTitle render={<h1>Recupere sua conta</h1>} />
-              <CardDescription
-                render={
-                  <h2>
-                    Enviaremos um e-mail com um código para alteração de sua
-                    senha.
-                  </h2>
-                }
-              />
-            </CardHeader>
+        onSubmit={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          form.handleSubmit();
+        }}
+      >
+        <Card>
+          <CardHeader>
+            <CardTitle>Recupere sua conta</CardTitle>
+            <CardDescription>
+              Enviaremos um e-mail com um código para alteração de sua senha.
+            </CardDescription>
+          </CardHeader>
 
-            <CardContent
+          <CardContent>
+            <FieldGroup>
+              <form.AppField name="email">
+                {(field) => (
+                  <field.TextField
+                    label="E-mail"
+                    props={{
+                      type: "email",
+                      placeholder: "joao.silva@email.com",
+                      autoComplete: "email",
+                      required: true,
+                    }}
+                  />
+                )}
+              </form.AppField>
+
+              <form.FormError />
+            </FieldGroup>
+          </CardContent>
+
+          <CardFooter className="flex-col space-y-4">
+            <form.SubmitButton disabled={form.state.isSubmitted}>
+              Enviar
+            </form.SubmitButton>
+
+            <Button
+              className="mr-4"
+              variant="link"
+              nativeButton={false}
               render={
-                <FieldGroup>
-                  <form.AppField name="email">
-                    {(field) => (
-                      <field.TextField
-                        label="E-mail"
-                        props={{
-                          type: "email",
-                          placeholder: "joao.silva@email.com",
-                          autoComplete: "email",
-                          required: true,
-                        }}
-                      />
-                    )}
-                  </form.AppField>
-
-                  <form.FormError />
-                </FieldGroup>
+                <Link href="entrar">
+                  <HugeiconsIcon
+                    icon={ArrowLeft01Icon}
+                    className="inline h-4 w-4"
+                  />
+                  Voltar para o login
+                </Link>
               }
             />
-
-            <CardFooter className="flex-col space-y-4">
-              <form.SubmitButton disabled={form.state.isSubmitted}>
-                Enviar
-              </form.SubmitButton>
-
-              <Button
-                className="mr-4"
-                variant="link"
-                nativeButton={false}
-                render={
-                  <Link href="entrar">
-                    <HugeiconsIcon
-                      icon={ArrowLeft01Icon}
-                      className="inline h-4 w-4"
-                    />
-                    Voltar para o login
-                  </Link>
-                }
-              />
-            </CardFooter>
-          </form>
-        }
-      />
+          </CardFooter>
+        </Card>
+      </form>
     </form.AppForm>
   );
 }

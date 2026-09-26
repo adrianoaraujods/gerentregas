@@ -50,106 +50,97 @@ export function LoginForm() {
 
   return (
     <form.AppForm>
-      <Card
+      <form
         className="w-full max-w-md"
-        render={
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              form.handleSubmit();
-            }}
-          >
-            <CardHeader>
-              <CardTitle render={<h1>Bem-vindo de volta!</h1>} />
+        onSubmit={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          form.handleSubmit();
+        }}
+      >
+        <Card>
+          <CardHeader>
+            <CardTitle>Bem-vindo de volta!</CardTitle>
 
-              <CardDescription
-                render={<h2>Entre com seus dados abaixo para continuar</h2>}
+            <CardDescription>
+              Entre com seus dados abaixo para continuar
+            </CardDescription>
+          </CardHeader>
+
+          <CardContent>
+            <FieldGroup>
+              <form.AppField name="email">
+                {(field) => (
+                  <field.TextField
+                    label="E-mail"
+                    props={{ type: "email", placeholder: "seu@email.com" }}
+                  />
+                )}
+              </form.AppField>
+
+              <form.AppField name="password">
+                {(field) => (
+                  <field.TextField
+                    label={
+                      <>
+                        <span>Senha</span>{" "}
+                        <Button
+                          className="ml-auto p-0"
+                          variant="link"
+                          nativeButton={false}
+                          render={
+                            <Link href="/recuperar-conta">
+                              Esqueceu sua senha?
+                            </Link>
+                          }
+                        />
+                      </>
+                    }
+                    props={{
+                      type: showPassword ? "text" : "password",
+                      placeholder: "••••••••",
+                    }}
+                    suffix={
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className="-mr-1"
+                        size="icon"
+                        onClick={() => setShowPassword((prev) => !prev)}
+                        aria-label={
+                          showPassword ? "Esconder senha" : "Mostrar senha"
+                        }
+                      >
+                        {showPassword ? (
+                          <HugeiconsIcon icon={EyeOffIcon} className="size-4" />
+                        ) : (
+                          <HugeiconsIcon icon={EyeIcon} className="size-4" />
+                        )}
+                      </Button>
+                    }
+                  />
+                )}
+              </form.AppField>
+
+              <form.FormError />
+            </FieldGroup>
+          </CardContent>
+
+          <CardFooter className="flex-col space-y-4">
+            <form.SubmitButton>Entrar</form.SubmitButton>
+
+            <span>
+              Ainda não tem uma conta?{" "}
+              <Button
+                className="px-2"
+                variant="link"
+                nativeButton={false}
+                render={<Link href="/cadastrar">Cadastre-se</Link>}
               />
-            </CardHeader>
-
-            <CardContent
-              render={
-                <FieldGroup>
-                  <form.AppField name="email">
-                    {(field) => (
-                      <field.TextField
-                        label="E-mail"
-                        props={{ type: "email", placeholder: "seu@email.com" }}
-                      />
-                    )}
-                  </form.AppField>
-
-                  <form.AppField name="password">
-                    {(field) => (
-                      <field.TextField
-                        label={
-                          <>
-                            <span>Senha</span>{" "}
-                            <Button
-                              className="ml-auto p-0 text-primary text-sm"
-                              variant="link"
-                              nativeButton={false}
-                              render={
-                                <Link href="/recuperar-conta">
-                                  Esqueceu sua senha?
-                                </Link>
-                              }
-                            />
-                          </>
-                        }
-                        props={{
-                          type: showPassword ? "text" : "password",
-                          placeholder: "••••••••",
-                        }}
-                        suffix={
-                          <Button
-                            type="button"
-                            variant="primary-hover"
-                            size="icon"
-                            onClick={() => setShowPassword((prev) => !prev)}
-                            aria-label={
-                              showPassword ? "Esconder senha" : "Mostrar senha"
-                            }
-                          >
-                            {showPassword ? (
-                              <HugeiconsIcon
-                                icon={EyeOffIcon}
-                                className="size-4"
-                              />
-                            ) : (
-                              <HugeiconsIcon
-                                icon={EyeIcon}
-                                className="size-4"
-                              />
-                            )}
-                          </Button>
-                        }
-                      />
-                    )}
-                  </form.AppField>
-
-                  <form.FormError />
-                </FieldGroup>
-              }
-            />
-
-            <CardFooter className="flex-col space-y-4">
-              <form.SubmitButton>Entrar</form.SubmitButton>
-
-              <span>
-                Ainda não tem uma conta?{" "}
-                <Button
-                  className="px-2"
-                  variant="link"
-                  nativeButton={false}
-                  render={<Link href="/cadastrar">Cadastre-se</Link>}
-                />
-              </span>
-            </CardFooter>
-          </form>
-        }
-      />
+            </span>
+          </CardFooter>
+        </Card>
+      </form>
     </form.AppForm>
   );
 }

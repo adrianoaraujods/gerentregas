@@ -82,7 +82,7 @@ export function ChangePasswordDialog({
                     suffix={
                       <Button
                         type="button"
-                        variant="primary-hover"
+                        variant="outline"
                         size="icon"
                         onClick={() => setShowPassword((prev) => !prev)}
                         aria-label={
@@ -109,7 +109,7 @@ export function ChangePasswordDialog({
                     suffix={
                       <Button
                         type="button"
-                        variant="primary-hover"
+                        variant="outline"
                         size="icon"
                         onClick={() => setShowConfirmPassword((prev) => !prev)}
                         aria-label={

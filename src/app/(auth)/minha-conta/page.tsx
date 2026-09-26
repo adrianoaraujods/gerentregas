@@ -27,10 +27,10 @@ export default async function MinhaContaPage() {
     >
       <Card className="w-full">
         <CardHeader className="border-b">
-          <CardTitle render={<h1>Minha conta</h1>} />
-          <CardDescription
-            render={<h2>Gerencie seus dados de acesso da Gerentregas.</h2>}
-          />
+          <CardTitle>Minha conta</CardTitle>
+          <CardDescription>
+            Gerencie seus dados de acesso da Gerentregas.
+          </CardDescription>
         </CardHeader>
 
         <CardContent className="grid gap-6">

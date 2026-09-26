@@ -153,15 +153,11 @@ export default function FrotaPage() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
-            <CardTitle render={<h1>Gestão de Frota</h1>} />
-            <CardDescription
-              render={
-                <h2>
-                  Cadastre e gerencie a disponibilidade dos veículos utilizados
-                  nos roteiros.
-                </h2>
-              }
-            />
+            <CardTitle>Gestão de Frota</CardTitle>
+            <CardDescription>
+              Cadastre e gerencie a disponibilidade dos veículos utilizados nos
+              roteiros.
+            </CardDescription>
           </div>
           <Button onClick={openCreateModal}>+ Novo Veículo</Button>
         </CardHeader>
