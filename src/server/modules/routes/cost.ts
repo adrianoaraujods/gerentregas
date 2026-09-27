@@ -6,7 +6,7 @@ export function computeRouteCostCents(args: {
   kmPerLiterHundredths: number;
 }): number {
   return Math.round(
-    (args.distanceHundredths * args.fuelPricePerLiter) /
+    (args.distanceHundredths * args.fuelPricePerLiter * 100) /
       args.kmPerLiterHundredths,
   );
 }

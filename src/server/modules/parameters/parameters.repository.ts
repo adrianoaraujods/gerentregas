@@ -20,17 +20,18 @@ export class ParametersRepository {
   }
 
   async upsert(input: NewParameter) {
+    const fuelPricePerLiter = Math.round(input.fuelPricePerLiter * 100);
     const [row] = await this.db
       .insert(parameter)
       .values({
         id: PARAMETER_ID,
-        fuelPricePerLiter: input.fuelPricePerLiter,
+        fuelPricePerLiter,
         standardWorkdayDuration: input.standardWorkdayDuration,
       })
       .onConflictDoUpdate({
         target: parameter.id,
         set: {
-          fuelPricePerLiter: input.fuelPricePerLiter,
+          fuelPricePerLiter,
           standardWorkdayDuration: input.standardWorkdayDuration,
           updatedAt: new Date(),
         },
@@ -42,8 +43,7 @@ export class ParametersRepository {
   private toDomain(row: typeof parameter.$inferSelect): Parameter {
     return {
       ...row,
-      fuelPricePerLiter: row.fuelPricePerLiter,
-      standardWorkdayDuration: row.standardWorkdayDuration,
+      fuelPricePerLiter: row.fuelPricePerLiter / 100,
     };
   }
 }

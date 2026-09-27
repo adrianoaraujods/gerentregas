@@ -1,7 +1,9 @@
+import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { NotFoundError } from "@/server/api";
 import { db } from "@/server/db";
+import { parameter } from "@/server/db/schemas/parameters";
 import { ParametersRepository } from "@/server/modules/parameters/parameters.repository";
 import { ParametersService } from "@/server/modules/parameters/parameters.service";
 
@@ -21,8 +23,7 @@ describe("ParametersService", () => {
 
     it("returns parameters when they exist", async () => {
       await repository.upsert({
-        id: "system",
-        fuelPricePerLiter: 600,
+        fuelPricePerLiter: 6.0,
         standardWorkdayDuration: 480,
       });
 
@@ -46,8 +47,7 @@ describe("ParametersService", () => {
 
     it("updates existing parameters", async () => {
       await repository.upsert({
-        id: "system",
-        fuelPricePerLiter: 600,
+        fuelPricePerLiter: 6.0,
         standardWorkdayDuration: 480,
       });
 
@@ -60,14 +60,21 @@ describe("ParametersService", () => {
       expect(result.standardWorkdayDuration).toBe(540);
     });
 
-    it("converts fuel price to cents in repository", async () => {
+    it("stores fuel price as cents without leaking the storage unit", async () => {
       await service.update({
         fuelPricePerLiter: 6.5,
         standardWorkdayDuration: 480,
       });
 
-      const stored = await repository.find();
-      expect(stored?.fuelPricePerLiter).toBe(650);
+      const param = await repository.find();
+      expect(param?.fuelPricePerLiter).toBe(6.5);
+
+      const [row] = await db
+        .select()
+        .from(parameter)
+        .where(eq(parameter.id, "system"))
+        .limit(1);
+      expect(row.fuelPricePerLiter).toBe(650);
     });
   });
 
