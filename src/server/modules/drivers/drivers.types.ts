@@ -1,6 +1,7 @@
 import { createSelectSchema } from "drizzle-orm/zod";
 import { z } from "zod";
 
+import { phoneSchema } from "@/lib/validators";
 import { user, userRoleEnum } from "@/server/db/schemas/auth";
 
 export const userRoleSchema = createSelectSchema(userRoleEnum);
@@ -33,12 +34,7 @@ export const createDriverInputSchema = z.object({
   name: z.string().nonempty("Nome é obrigatório"),
   email: z.email("E-mail válido é obrigatório"),
   password: z.string().min(6, "Senha deve ter no mínimo 6 caracteres"),
-  phone: z
-    .string()
-    .regex(
-      /^\+\d{10,15}$/,
-      "Telefone deve estar no formato E.164 (ex: +5511999999999)",
-    ),
+  phone: phoneSchema,
   document: z.string().regex(/^\d{11}$/, "CPF deve ter 11 dígitos"),
 });
 export type CreateDriverInput = z.infer<typeof createDriverInputSchema>;
@@ -50,10 +46,7 @@ export type CreateManagerInput = z.infer<typeof createManagerInputSchema>;
 
 export const updateDriverInputSchema = z.object({
   name: z.string().nonempty("Nome é obrigatório").optional(),
-  phone: z
-    .string()
-    .regex(/^\+\d{10,15}$/, "Telefone deve estar no formato E.164")
-    .optional(),
+  phone: phoneSchema.optional(),
   document: z
     .string()
     .regex(/^\d{11}$/, "CPF deve ter 11 dígitos")

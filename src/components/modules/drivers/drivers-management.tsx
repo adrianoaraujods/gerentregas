@@ -1,13 +1,16 @@
 "use client";
 
+import { revalidateLogic } from "@tanstack/react-form";
 import { keepPreviousData } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
+import { z } from "zod";
 import {
   createAppColumnHelper,
   DataTable,
   useAppTable,
 } from "@/components/data-table";
+import { useAppForm } from "@/components/hooks/use-app-form";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,11 +38,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { FieldGroup } from "@/components/ui/field";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { api } from "@/lib/api/client";
+import { formatPhone } from "@/lib/formatter";
+import { normalizePhone, phoneSchema } from "@/lib/validators";
 import type { RouterOutputs } from "@/server/api/router";
+import { createDriverInputSchema } from "@/server/modules/drivers/drivers.types";
 
 const columnHelper = createAppColumnHelper<ManagedUser>();
 
@@ -52,18 +57,185 @@ const ROLE_OPTIONS = [
 type ManagedUser = RouterOutputs["drivers"]["list"]["drivers"][number];
 type ManagedRole = "driver" | "manager";
 
+type ManagedUserFormValues = {
+  name: string;
+  email: string;
+  password: string;
+  phone: string;
+  document: string;
+};
+
+function ManagedUserForm({
+  editingUser,
+  singular,
+  isSubmitting,
+  onCancel,
+  onSubmit,
+}: {
+  editingUser: ManagedUser | null;
+  singular: string;
+  isSubmitting: boolean;
+  onCancel: () => void;
+  onSubmit: (values: ManagedUserFormValues) => void;
+}) {
+  const documentSchema = editingUser
+    ? z
+        .string()
+        .refine(
+          (value) =>
+            value === "" ||
+            createDriverInputSchema.shape.document.safeParse(value).success,
+          "CPF deve ter 11 dígitos",
+        )
+    : createDriverInputSchema.shape.document;
+
+  const formSchema = z.object({
+    name: createDriverInputSchema.shape.name,
+    email: editingUser ? z.string() : createDriverInputSchema.shape.email,
+    password: editingUser ? z.string() : createDriverInputSchema.shape.password,
+    phone: phoneSchema,
+    document: documentSchema,
+  });
+
+  const form = useAppForm({
+    defaultValues: {
+      name: editingUser?.name ?? "",
+      email: "",
+      password: "",
+      phone: normalizePhone(editingUser?.phone ?? ""),
+      document: "",
+    },
+    validationLogic: revalidateLogic({ modeAfterSubmission: "change" }),
+    validators: { onDynamic: formSchema },
+    onSubmit: async ({ value }) => {
+      onSubmit(value as ManagedUserFormValues);
+    },
+  });
+
+  return (
+    <form.AppForm>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          form.handleSubmit();
+        }}
+      >
+        <DialogHeader>
+          <DialogTitle>
+            {editingUser ? `Editar ${singular}` : `Cadastrar ${singular}`}
+          </DialogTitle>
+          <DialogDescription>
+            {editingUser
+              ? "Atualize nome, telefone ou CPF. O documento permanece criptografado no banco."
+              : "Informe os dados para criar o acesso. O CPF é criptografado antes de ser salvo."}
+          </DialogDescription>
+        </DialogHeader>
+
+        <FieldGroup className="py-4">
+          <form.AppField name="name">
+            {(field) => (
+              <field.TextField
+                label="Nome"
+                props={{
+                  placeholder: "Ex: João da Silva",
+                  disabled: isSubmitting,
+                }}
+              />
+            )}
+          </form.AppField>
+
+          {!editingUser && (
+            <>
+              <form.AppField name="email">
+                {(field) => (
+                  <field.TextField
+                    label="E-mail"
+                    props={{
+                      type: "email",
+                      placeholder: "Ex: joao@email.com",
+                      disabled: isSubmitting,
+                    }}
+                  />
+                )}
+              </form.AppField>
+
+              <form.AppField name="password">
+                {(field) => (
+                  <field.TextField
+                    label="Senha"
+                    props={{
+                      type: "password",
+                      placeholder: "Mínimo 6 caracteres",
+                      disabled: isSubmitting,
+                    }}
+                  />
+                )}
+              </form.AppField>
+            </>
+          )}
+
+          <form.AppField name="phone">
+            {(field) => (
+              <field.PhoneField
+                label="Telefone"
+                props={{
+                  placeholder: "Ex: (11) 99999-9999",
+                  disabled: isSubmitting,
+                }}
+              />
+            )}
+          </form.AppField>
+
+          <form.AppField name="document">
+            {(field) => (
+              <field.DocumentField
+                label="CPF"
+                props={{
+                  placeholder: editingUser
+                    ? "Deixe vazio para manter o CPF atual"
+                    : "Ex: 123.456.789-01",
+                  disabled: isSubmitting,
+                }}
+              />
+            )}
+          </form.AppField>
+
+          <form.FormError />
+        </FieldGroup>
+
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onCancel}
+            disabled={isSubmitting}
+          >
+            Cancelar
+          </Button>
+          <form.SubmitButton
+            className="w-auto"
+            size="default"
+            disabled={isSubmitting}
+          >
+            {isSubmitting
+              ? "Salvando..."
+              : editingUser
+                ? "Salvar alterações"
+                : "Cadastrar"}
+          </form.SubmitButton>
+        </DialogFooter>
+      </form>
+    </form.AppForm>
+  );
+}
+
 export function DriversManagement({ isAdmin }: { isAdmin: boolean }) {
   const [tab, setTab] = useState<ManagedRole>("driver");
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<ManagedUser | null>(null);
   const [userToDelete, setUserToDelete] = useState<ManagedUser | null>(null);
-
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [phone, setPhone] = useState("");
-  const [document, setDocument] = useState("");
 
   const utils = api.useUtils();
 
@@ -130,21 +302,11 @@ export function DriversManagement({ isAdmin }: { isAdmin: boolean }) {
 
   const openCreateModal = () => {
     setEditingUser(null);
-    setName("");
-    setEmail("");
-    setPassword("");
-    setPhone("");
-    setDocument("");
     setIsModalOpen(true);
   };
 
   const openEditModal = (user: ManagedUser) => {
     setEditingUser(user);
-    setName(user.name);
-    setEmail(user.email);
-    setPassword("");
-    setPhone(user.phone ?? "");
-    setDocument("");
     setIsModalOpen(true);
   };
 
@@ -153,58 +315,29 @@ export function DriversManagement({ isAdmin }: { isAdmin: boolean }) {
     setEditingUser(null);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!name.trim()) {
-      toast.error("Informe o nome.");
-      return;
-    }
-    if (!/^\+\d{10,15}$/.test(phone)) {
-      toast.error("Telefone deve estar no formato E.164 (ex: +5511999999999).");
-      return;
-    }
-    if (document && !/^\d{11}$/.test(document)) {
-      toast.error("CPF deve ter 11 dígitos.");
-      return;
-    }
-
+  const handleFormSubmit = (values: ManagedUserFormValues) => {
     if (editingUser) {
       updateMutation.mutate({
         id: editingUser.id,
-        name: name.trim(),
-        phone,
-        ...(document ? { document } : {}),
+        name: values.name.trim(),
+        phone: values.phone,
+        ...(values.document ? { document: values.document } : {}),
       });
       return;
     }
 
-    if (!email.trim()) {
-      toast.error("Informe o e-mail.");
-      return;
-    }
-    if (password.length < 6) {
-      toast.error("Senha deve ter no mínimo 6 caracteres.");
-      return;
-    }
+    const base = {
+      name: values.name.trim(),
+      email: values.email.trim(),
+      password: values.password,
+      phone: values.phone,
+      document: values.document,
+    };
 
     if (tab === "manager") {
-      createManagerMutation.mutate({
-        name: name.trim(),
-        email: email.trim(),
-        password,
-        phone,
-        document,
-        role: "manager",
-      });
+      createManagerMutation.mutate({ ...base, role: "manager" });
     } else {
-      createDriverMutation.mutate({
-        name: name.trim(),
-        email: email.trim(),
-        password,
-        phone,
-        document,
-      });
+      createDriverMutation.mutate(base);
     }
   };
 
@@ -222,7 +355,10 @@ export function DriversManagement({ isAdmin }: { isAdmin: boolean }) {
       }),
       columnHelper.accessor("phone", {
         meta: { variant: "text", label: "Telefone" },
-        cell: ({ getValue }) => getValue() ?? "—",
+        cell: ({ getValue }) => {
+          const value = getValue();
+          return value ? formatPhone(normalizePhone(value)) : "—";
+        },
       }),
       columnHelper.accessor("document", {
         meta: { variant: "text", label: "CPF" },
@@ -323,109 +459,14 @@ export function DriversManagement({ isAdmin }: { isAdmin: boolean }) {
 
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent>
-          <form onSubmit={handleSubmit}>
-            <DialogHeader>
-              <DialogTitle>
-                {editingUser ? `Editar ${singular}` : `Cadastrar ${singular}`}
-              </DialogTitle>
-              <DialogDescription>
-                {editingUser
-                  ? "Atualize nome, telefone ou CPF. O documento permanece criptografado no banco."
-                  : "Informe os dados para criar o acesso. O CPF é criptografado antes de ser salvo."}
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="grid gap-4 py-4">
-              <div className="grid gap-2">
-                <Label htmlFor="user-name">Nome</Label>
-                <Input
-                  id="user-name"
-                  placeholder="Ex: João da Silva"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  disabled={isSubmitting}
-                  required
-                />
-              </div>
-
-              {!editingUser && (
-                <>
-                  <div className="grid gap-2">
-                    <Label htmlFor="user-email">E-mail</Label>
-                    <Input
-                      id="user-email"
-                      type="email"
-                      placeholder="Ex: joao@email.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      disabled={isSubmitting}
-                      required
-                    />
-                  </div>
-
-                  <div className="grid gap-2">
-                    <Label htmlFor="user-password">Senha</Label>
-                    <Input
-                      id="user-password"
-                      type="password"
-                      placeholder="Mínimo 6 caracteres"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      disabled={isSubmitting}
-                      required
-                    />
-                  </div>
-                </>
-              )}
-
-              <div className="grid gap-2">
-                <Label htmlFor="user-phone">Telefone (E.164)</Label>
-                <Input
-                  id="user-phone"
-                  placeholder="Ex: +5511999999999"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  disabled={isSubmitting}
-                  required
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="user-document">CPF (11 dígitos)</Label>
-                <Input
-                  id="user-document"
-                  inputMode="numeric"
-                  placeholder={
-                    editingUser
-                      ? "Deixe vazio para manter o CPF atual"
-                      : "Ex: 12345678901"
-                  }
-                  value={document}
-                  onChange={(e) => setDocument(e.target.value)}
-                  disabled={isSubmitting}
-                  required={!editingUser}
-                />
-              </div>
-            </div>
-
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={closeModal}
-                disabled={isSubmitting}
-              >
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting
-                  ? "Salvando..."
-                  : editingUser
-                    ? "Salvar alterações"
-                    : "Cadastrar"}
-              </Button>
-            </DialogFooter>
-          </form>
+          <ManagedUserForm
+            key={editingUser ? `edit-${editingUser.id}` : `create-${tab}`}
+            editingUser={editingUser}
+            singular={singular}
+            isSubmitting={isSubmitting}
+            onCancel={closeModal}
+            onSubmit={handleFormSubmit}
+          />
         </DialogContent>
       </Dialog>
 

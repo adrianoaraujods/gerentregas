@@ -78,14 +78,14 @@ describe("drivers router", () => {
         name: "João Motorista",
         email: "joao@test.com",
         password: "senha123",
-        phone: "+5511999999999",
+        phone: "11999999999",
         document: "12345678901",
       });
 
       expect(result.id).toBeDefined();
       expect(result.name).toBe("João Motorista");
       expect(result.email).toBe("joao@test.com");
-      expect(result.phone).toBe("+5511999999999");
+      expect(result.phone).toBe("11999999999");
       expect(result.document).toBe("***.***.***-01"); // masked, no plaintext in response
       expect(result.role).toBe("driver");
     });
@@ -96,7 +96,7 @@ describe("drivers router", () => {
           name: "João Motorista",
           email: "joao@test.com",
           password: "senha123",
-          phone: "+5511999999999",
+          phone: "11999999999",
           document: "12345678901",
         }),
       ).rejects.toThrow(ForbiddenError);
@@ -113,7 +113,7 @@ describe("drivers router", () => {
           name: "João Motorista",
           email: "joao@test.com",
           password: "senha123",
-          phone: "+5511999999999",
+          phone: "11999999999",
           document: "12345678901",
         }),
       ).rejects.toThrow(UnauthorizedError);
@@ -124,7 +124,7 @@ describe("drivers router", () => {
         name: "João Motorista",
         email: "joao@test.com",
         password: "senha123",
-        phone: "+5511999999999",
+        phone: "11999999999",
         document: "12345678901",
       });
 
@@ -133,7 +133,7 @@ describe("drivers router", () => {
           name: "Outro Motorista",
           email: "joao@test.com",
           password: "senha123",
-          phone: "+5511888888888",
+          phone: "1188888888",
           document: "10987654321",
         }),
       ).rejects.toThrow(ConflictError);
@@ -145,19 +145,29 @@ describe("drivers router", () => {
           name: "João Motorista",
           email: "joao@test.com",
           password: "senha123",
-          phone: "+5511999999999",
+          phone: "11999999999",
           document: "1234567890", // 10 digits
         }),
       ).rejects.toThrow();
     });
 
-    it("validates phone format (E.164)", async () => {
+    it("validates phone format (digits only with DDD)", async () => {
       await expect(
         managerCaller.drivers.create({
           name: "João Motorista",
           email: "joao@test.com",
           password: "senha123",
-          phone: "11999999999", // missing +55
+          phone: "+5511999999999", // E.164 no longer accepted
+          document: "12345678901",
+        }),
+      ).rejects.toThrow();
+
+      await expect(
+        managerCaller.drivers.create({
+          name: "João Motorista",
+          email: "joao@test.com",
+          password: "senha123",
+          phone: "119999999", // 9 digits
           document: "12345678901",
         }),
       ).rejects.toThrow();
@@ -170,7 +180,7 @@ describe("drivers router", () => {
         name: "Maria Gerente",
         email: "maria@test.com",
         password: "senha123",
-        phone: "+5511999999999",
+        phone: "11999999999",
         document: "12345678901",
         role: "manager",
       });
@@ -187,7 +197,7 @@ describe("drivers router", () => {
           name: "Maria Gerente",
           email: "maria@test.com",
           password: "senha123",
-          phone: "+5511999999999",
+          phone: "11999999999",
           document: "12345678901",
           role: "manager",
         }),
@@ -200,7 +210,7 @@ describe("drivers router", () => {
           name: "Maria Gerente",
           email: "maria@test.com",
           password: "senha123",
-          phone: "+5511999999999",
+          phone: "11999999999",
           document: "12345678901",
           role: "manager",
         }),
@@ -214,7 +224,7 @@ describe("drivers router", () => {
         name: "Driver 1",
         email: "driver1@test.com",
         password: "senha123",
-        phone: "+5511999999999",
+        phone: "11999999999",
         document: "11111111111",
       });
 
@@ -222,7 +232,7 @@ describe("drivers router", () => {
         name: "Driver 2",
         email: "driver2@test.com",
         password: "senha123",
-        phone: "+5511888888888",
+        phone: "1188888888",
         document: "22222222222",
       });
 
@@ -236,7 +246,7 @@ describe("drivers router", () => {
         name: "Driver 1",
         email: "driver1@test.com",
         password: "senha123",
-        phone: "+5511999999999",
+        phone: "11999999999",
         document: "11111111111",
       });
 
@@ -259,7 +269,7 @@ describe("drivers router", () => {
           name: `Driver ${i}`,
           email: `driver${i}@test.com`,
           password: "senha123",
-          phone: `+55119999999${i.toString().padStart(2, "0")}`,
+          phone: `1199999${i.toString().padStart(4, "0")}`,
           document: `${i}`.repeat(11),
         });
       }
@@ -277,7 +287,7 @@ describe("drivers router", () => {
         name: "Carlos Silva",
         email: "carlos@test.com",
         password: "senha123",
-        phone: "+5511999999999",
+        phone: "11999999999",
         document: "11111111111",
       });
 
@@ -285,7 +295,7 @@ describe("drivers router", () => {
         name: "Ana Souza",
         email: "ana@test.com",
         password: "senha123",
-        phone: "+5511888888888",
+        phone: "1188888888",
         document: "22222222222",
       });
 
@@ -312,7 +322,7 @@ describe("drivers router", () => {
         name: "Driver 1",
         email: "driver1@test.com",
         password: "senha123",
-        phone: "+5511999999999",
+        phone: "11999999999",
         document: "11111111111",
       });
 
@@ -320,7 +330,7 @@ describe("drivers router", () => {
         name: "Manager 1",
         email: "manager1@test.com",
         password: "senha123",
-        phone: "+5511888888888",
+        phone: "1188888888",
         document: "22222222222",
         role: "manager",
       });
@@ -347,7 +357,7 @@ describe("drivers router", () => {
         name: "Driver 1",
         email: "driver1@test.com",
         password: "senha123",
-        phone: "+5511999999999",
+        phone: "11999999999",
         document: "11111111111",
       });
 
@@ -355,7 +365,7 @@ describe("drivers router", () => {
         name: "Manager 1",
         email: "manager1@test.com",
         password: "senha123",
-        phone: "+5511888888888",
+        phone: "1188888888",
         document: "22222222222",
         role: "manager",
       });
@@ -388,7 +398,7 @@ describe("drivers router", () => {
         name: "Driver 1",
         email: "driver1@test.com",
         password: "senha123",
-        phone: "+5511999999999",
+        phone: "11999999999",
         document: "11111111111",
       });
 
@@ -406,7 +416,7 @@ describe("drivers router", () => {
         name: "Driver 1",
         email: "driver1@test.com",
         password: "senha123",
-        phone: "+5511999999999",
+        phone: "11999999999",
         document: "11111111111",
       });
 
@@ -421,7 +431,7 @@ describe("drivers router", () => {
         name: "Driver 1",
         email: "driver1@test.com",
         password: "senha123",
-        phone: "+5511999999999",
+        phone: "11999999999",
         document: "11111111111",
       });
 
@@ -443,18 +453,18 @@ describe("drivers router", () => {
         name: "Driver 1",
         email: "driver1@test.com",
         password: "senha123",
-        phone: "+5511999999999",
+        phone: "11999999999",
         document: "11111111111",
       });
 
       const result = await managerCaller.drivers.update({
         id: created.id,
         name: "Driver 1 Updated",
-        phone: "+5511888888888",
+        phone: "1188888888",
       });
 
       expect(result.name).toBe("Driver 1 Updated");
-      expect(result.phone).toBe("+5511888888888");
+      expect(result.phone).toBe("1188888888");
       expect(result.document).toBe("***.***.***-11"); // masked, unchanged
     });
 
@@ -463,7 +473,7 @@ describe("drivers router", () => {
         name: "Driver 1",
         email: "driver1@test.com",
         password: "senha123",
-        phone: "+5511999999999",
+        phone: "11999999999",
         document: "11111111111",
       });
 
@@ -480,7 +490,7 @@ describe("drivers router", () => {
         name: "Driver 1",
         email: "driver1@test.com",
         password: "senha123",
-        phone: "+5511999999999",
+        phone: "11999999999",
         document: "11111111111",
       });
 
@@ -508,7 +518,7 @@ describe("drivers router", () => {
         name: "Driver 1",
         email: "driver1@test.com",
         password: "senha123",
-        phone: "+5511999999999",
+        phone: "11999999999",
         document: "11111111111",
       });
 
@@ -523,7 +533,7 @@ describe("drivers router", () => {
         name: "Driver 1",
         email: "driver1@test.com",
         password: "senha123",
-        phone: "+5511999999999",
+        phone: "11999999999",
         document: "11111111111",
       });
 
@@ -538,7 +548,7 @@ describe("drivers router", () => {
         name: "Driver 1",
         email: "driver1@test.com",
         password: "senha123",
-        phone: "+5511999999999",
+        phone: "11999999999",
         document: "11111111111",
       });
 
@@ -554,7 +564,7 @@ describe("drivers router", () => {
         name: "Driver 1",
         email: "driver1@test.com",
         password: "senha123",
-        phone: "+5511999999999",
+        phone: "11999999999",
         document: "11111111111",
       });
 
@@ -573,7 +583,7 @@ describe("drivers router", () => {
         name: "Driver 1",
         email: "driver1@test.com",
         password: "senha123",
-        phone: "+5511999999999",
+        phone: "11999999999",
         document: "11111111111",
       });
 
@@ -589,7 +599,7 @@ describe("drivers router", () => {
         name: "Driver 1",
         email: "driver1@test.com",
         password: "senha123",
-        phone: "+5511999999999",
+        phone: "11999999999",
         document: "11111111111",
       });
 
@@ -605,7 +615,7 @@ describe("drivers router", () => {
         name: "Driver 1",
         email: "driver1@test.com",
         password: "senha123",
-        phone: "+5511999999999",
+        phone: "11999999999",
         document: "11111111111",
       });
 

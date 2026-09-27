@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { formatPhone } from "@/lib/formatter";
+import { normalizePhone } from "@/lib/validators";
 
 export function PhoneField({
   label,
@@ -20,14 +21,21 @@ export function PhoneField({
   const isInvalid = field.state.meta.isTouched && !field.state.meta.isValid;
 
   const [inputValue, setInputValue] = React.useState(
-    formatPhone(field.state.value),
+    formatPhone(normalizePhone(field.state.value)),
   );
 
   React.useEffect(() => {
-    if (field.state.value.length <= 11) {
-      setInputValue(formatPhone(field.state.value));
+    const normalized = normalizePhone(field.state.value);
+
+    if (normalized !== field.state.value) {
+      field.handleChange(normalized);
+      return;
     }
-  }, [field.state.value]);
+
+    if (normalized.length <= 11) {
+      setInputValue(formatPhone(normalized));
+    }
+  }, [field.state.value, field.handleChange]);
 
   function handleBlur(e: React.FocusEvent<HTMLInputElement, Element>) {
     if (props?.onBlur) props.onBlur(e);
@@ -36,7 +44,7 @@ export function PhoneField({
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     if (props?.onChange) props.onChange(e);
-    field.handleChange(e.target.value.replace(/\D/g, ""));
+    field.handleChange(normalizePhone(e.target.value));
   }
 
   return (
@@ -54,6 +62,8 @@ export function PhoneField({
         onChange={handleChange}
         aria-invalid={isInvalid}
         type="text"
+        inputMode="numeric"
+        maxLength={15}
         {...props}
       />
 
