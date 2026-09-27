@@ -53,6 +53,16 @@
           }
         }
       }
+    },
+    {
+      "includes": ["src/components/data-table/**"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noExplicitAny": "off"
+          }
+        }
+      }
     }
   ],
   "assist": {

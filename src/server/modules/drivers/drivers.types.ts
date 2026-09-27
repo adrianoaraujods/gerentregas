@@ -62,7 +62,7 @@ export const updateDriverInputSchema = z.object({
 export type UpdateDriverInput = z.infer<typeof updateDriverInputSchema>;
 
 export const listDriversInputSchema = z.object({
-  limit: z.number().int().positive().max(100).default(20),
+  limit: z.number().int().positive().max(1000).default(20),
   offset: z.number().int().nonnegative().default(0),
   role: userRoleSchema.optional(),
   search: z.string().trim().max(100).optional(),

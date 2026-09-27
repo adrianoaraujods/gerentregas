@@ -1,22 +1,13 @@
 "use client";
 
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
 import * as React from "react";
-import { Badge } from "@/components/ui/badge";
+import { DataTable, useAppTable } from "@/components/data-table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { api } from "@/lib/api/client";
 import type { GetAggregationInput } from "@/server/modules/dashboard";
 import { CsvExportButton } from "./csv-export";
+import { buildDrilldownColumns } from "./drilldown-columns";
 import { PeriodSelector } from "./period-selector";
 
 type PeriodType = "day" | "month" | "custom";
@@ -24,6 +15,8 @@ type PeriodType = "day" | "month" | "custom";
 interface PeriodHistoryContentProps {
   defaultPeriodType?: PeriodType;
 }
+
+const historyColumns = buildDrilldownColumns(true);
 
 export function PeriodHistoryContent({
   defaultPeriodType = "day",
@@ -63,23 +56,14 @@ export function PeriodHistoryContent({
     return utils.dashboard.exportCSV.fetch(buildQueryParams());
   };
 
-  const formatTime = (timeStr: string | null) => {
-    if (!timeStr) return "—";
-    try {
-      return format(new Date(timeStr), "HH:mm:ss", { locale: ptBR });
-    } catch {
-      return timeStr;
-    }
-  };
+  const stops = drilldown?.stops ?? [];
 
-  const formatDate = (timeStr: string | null) => {
-    if (!timeStr) return "—";
-    try {
-      return format(new Date(timeStr), "dd/MM/yyyy", { locale: ptBR });
-    } catch {
-      return timeStr;
-    }
-  };
+  const table = useAppTable({
+    data: stops,
+    columns: historyColumns,
+    getRowId: (row) => row.stopId,
+    initialState: { pagination: { pageIndex: 0, pageSize: 20 } },
+  });
 
   if (loadingDrilldown) {
     return (
@@ -113,64 +97,11 @@ export function PeriodHistoryContent({
 
         <Card>
           <CardContent className="pt-0">
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-12 text-center">Ordem</TableHead>
-                    <TableHead>Ponto</TableHead>
-                    <TableHead>Endereço</TableHead>
-                    <TableHead className="w-36 text-center">Data</TableHead>
-                    <TableHead className="w-32 text-center">Chegada</TableHead>
-                    <TableHead className="w-32 text-center">Saída</TableHead>
-                    <TableHead className="w-32 text-center">
-                      Tempo Parado
-                    </TableHead>
-                    <TableHead className="w-32 text-center">
-                      % Jornada
-                    </TableHead>
-                    <TableHead>Motorista</TableHead>
-                    <TableHead>Roteiro</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {[...Array(5)].map((_, i) => (
-                    // biome-ignore lint/suspicious/noArrayIndexKey: skeleton component, no state updates
-                    <TableRow key={i}>
-                      <TableCell className="text-center font-mono">
-                        <Skeleton className="h-4 w-12" />
-                      </TableCell>
-                      <TableCell>
-                        <Skeleton className="h-4 w-40" />
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        <Skeleton className="h-4 w-60" />
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Skeleton className="h-4 w-28" />
-                      </TableCell>
-                      <TableCell className="text-center font-mono">
-                        <Skeleton className="h-4 w-24" />
-                      </TableCell>
-                      <TableCell className="text-center font-mono">
-                        <Skeleton className="h-4 w-24" />
-                      </TableCell>
-                      <TableCell className="text-center font-mono tabular-nums">
-                        <Skeleton className="h-4 w-20" />
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Skeleton className="h-4 w-24" />
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        <Skeleton className="h-4 w-32" />
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        <Skeleton className="h-4 w-24" />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+            <div className="space-y-3">
+              {Array.from({ length: 8 }).map((_, i) => (
+                // biome-ignore lint/suspicious/noArrayIndexKey: Skeletons are static
+                <Skeleton key={i} className="h-8 w-full" />
+              ))}
             </div>
           </CardContent>
         </Card>
@@ -216,8 +147,6 @@ export function PeriodHistoryContent({
       </div>
     );
   }
-
-  const stops = drilldown.stops || [];
 
   return (
     <div className="space-y-6">
@@ -307,81 +236,10 @@ export function PeriodHistoryContent({
 
       <Card>
         <CardContent className="pt-0">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-12 text-center">Ordem</TableHead>
-                  <TableHead>Ponto</TableHead>
-                  <TableHead>Endereço</TableHead>
-                  <TableHead className="w-36 text-center">Data</TableHead>
-                  <TableHead className="w-32 text-center">Chegada</TableHead>
-                  <TableHead className="w-32 text-center">Saída</TableHead>
-                  <TableHead className="w-32 text-center">
-                    Tempo Parado
-                  </TableHead>
-                  <TableHead className="w-32 text-center">% Jornada</TableHead>
-                  <TableHead>Motorista</TableHead>
-                  <TableHead>Roteiro</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {stops.length === 0 ? (
-                  <TableRow>
-                    <TableCell
-                      colSpan={10}
-                      className="text-center py-12 text-muted-foreground"
-                    >
-                      Nenhuma parada com tempo parado neste período.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  stops.map((stop) => (
-                    <TableRow key={stop.stopId}>
-                      <TableCell className="text-center font-mono">
-                        {stop.order}
-                      </TableCell>
-                      <TableCell className="font-medium">
-                        {stop.pointName}
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">
-                        {stop.address}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {formatDate(stop.arrivalTime || stop.departureTime)}
-                      </TableCell>
-                      <TableCell className="text-center font-mono">
-                        {formatTime(stop.arrivalTime)}
-                      </TableCell>
-                      <TableCell className="text-center font-mono">
-                        {formatTime(stop.departureTime)}
-                      </TableCell>
-                      <TableCell className="text-center font-mono tabular-nums">
-                        {stop.dwellMinutes} min
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Badge
-                          variant={
-                            stop.workdayPercentage > 100
-                              ? "destructive"
-                              : "secondary"
-                          }
-                        >
-                          {stop.workdayPercentage.toFixed(1)}%
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        {stop.driverName}
-                      </TableCell>
-                      <TableCell className="text-sm font-mono text-muted-foreground">
-                        {stop.routeId.substring(0, 8)}...
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
+          <DataTable
+            table={table}
+            toolbarProps={{ searchPlaceholder: "Pesquisar paradas..." }}
+          />
         </CardContent>
       </Card>
     </div>

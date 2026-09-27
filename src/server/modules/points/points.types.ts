@@ -46,7 +46,7 @@ export const updatePointInputSchema = z.object({
 export type UpdatePointInput = z.infer<typeof updatePointInputSchema>;
 
 export const listPointsInputSchema = z.object({
-  limit: z.number().int().positive().max(100).default(20),
+  limit: z.number().int().positive().max(1000).default(20),
   offset: z.number().int().nonnegative().default(0),
   includeDeleted: z.boolean().default(false),
 });

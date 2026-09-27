@@ -1,7 +1,23 @@
 "use client";
 
+import { keepPreviousData } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
+import {
+  createAppColumnHelper,
+  DataTable,
+  useAppTable,
+} from "@/components/data-table";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,7 +27,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { DebounceInput } from "@/components/ui/debounce-input";
 import {
   Dialog,
   DialogContent,
@@ -22,30 +37,27 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { api } from "@/lib/api/client";
 import type { RouterOutputs } from "@/server/api/router";
 
-const PAGE_SIZE = 10;
+const columnHelper = createAppColumnHelper<ManagedUser>();
+
+const ROLE_OPTIONS = [
+  { label: "Motorista", value: "driver" },
+  { label: "Gerente", value: "manager" },
+  { label: "Admin", value: "admin" },
+];
 
 type ManagedUser = RouterOutputs["drivers"]["list"]["drivers"][number];
 type ManagedRole = "driver" | "manager";
 
 export function DriversManagement({ isAdmin }: { isAdmin: boolean }) {
   const [tab, setTab] = useState<ManagedRole>("driver");
-  const [search, setSearch] = useState("");
-  const [page, setPage] = useState(0);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<ManagedUser | null>(null);
+  const [userToDelete, setUserToDelete] = useState<ManagedUser | null>(null);
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -55,25 +67,19 @@ export function DriversManagement({ isAdmin }: { isAdmin: boolean }) {
 
   const utils = api.useUtils();
 
-  const { data, isLoading } = api.drivers.list.useQuery({
-    limit: PAGE_SIZE,
-    offset: page * PAGE_SIZE,
-    role: tab,
-    search: search.trim() ? search.trim() : undefined,
-  });
+  const { data, isLoading } = api.drivers.list.useQuery(
+    {
+      limit: 1000,
+      offset: 0,
+      role: tab,
+    },
+    { placeholderData: keepPreviousData },
+  );
 
   const users = data?.drivers ?? [];
-  const total = data?.total ?? 0;
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   const handleTabChange = (value: string) => {
     setTab(value as ManagedRole);
-    setPage(0);
-  };
-
-  const handleSearch = (value: string) => {
-    setSearch(value);
-    setPage(0);
   };
 
   const invalidate = () => utils.drivers.list.invalidate();
@@ -115,6 +121,7 @@ export function DriversManagement({ isAdmin }: { isAdmin: boolean }) {
     onSuccess: () => {
       toast.success("Usuário excluído com sucesso!");
       invalidate();
+      setUserToDelete(null);
     },
     onError: (err) => {
       toast.error(err.message || "Erro ao excluir usuário");
@@ -201,13 +208,73 @@ export function DriversManagement({ isAdmin }: { isAdmin: boolean }) {
     }
   };
 
-  const handleDelete = (user: ManagedUser) => {
-    if (
-      confirm(`Tem certeza que deseja excluir ${user.name} (${user.email})?`)
-    ) {
-      deleteMutation.mutate({ id: user.id });
-    }
-  };
+  const table = useAppTable({
+    data: users,
+    columns: columnHelper.columns([
+      columnHelper.accessor("name", {
+        meta: { variant: "text", label: "Nome" },
+        cell: ({ getValue }) => (
+          <span className="font-medium">{getValue()}</span>
+        ),
+      }),
+      columnHelper.accessor("email", {
+        meta: { variant: "text", label: "E-mail" },
+      }),
+      columnHelper.accessor("phone", {
+        meta: { variant: "text", label: "Telefone" },
+        cell: ({ getValue }) => getValue() ?? "—",
+      }),
+      columnHelper.accessor("document", {
+        meta: { variant: "text", label: "CPF" },
+        cell: ({ getValue }) => (
+          <span className="font-mono">{getValue() ?? "—"}</span>
+        ),
+      }),
+      columnHelper.accessor("role", {
+        meta: { variant: "select", label: "Perfil", options: ROLE_OPTIONS },
+        cell: ({ getValue }) => {
+          const value = getValue();
+          const label =
+            ROLE_OPTIONS.find((option) => option.value === value)?.label ??
+            "Admin";
+          return (
+            <Badge variant={value === "driver" ? "secondary" : "default"}>
+              {label}
+            </Badge>
+          );
+        },
+      }),
+      columnHelper.display({
+        id: "acoes",
+        header: () => <div className="text-right">Ações</div>,
+        cell: ({ row }) => (
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => openEditModal(row.original)}
+            >
+              Editar
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => setUserToDelete(row.original)}
+              disabled={deleteMutation.isPending}
+            >
+              Excluir
+            </Button>
+          </div>
+        ),
+        enableSorting: false,
+        enableGrouping: false,
+        enableHiding: false,
+        enableColumnFilter: false,
+      }),
+    ]),
+    getRowId: (row) => row.id,
+    initialState: { pagination: { pageIndex: 0, pageSize: 10 } },
+  });
 
   const isSubmitting =
     createDriverMutation.isPending ||
@@ -216,7 +283,6 @@ export function DriversManagement({ isAdmin }: { isAdmin: boolean }) {
 
   const isManagerTab = tab === "manager";
   const singular = isManagerTab ? "Gerente" : "Motorista";
-  const plural = isManagerTab ? "Gerentes" : "Motoristas";
 
   return (
     <div className="space-y-6">
@@ -232,115 +298,23 @@ export function DriversManagement({ isAdmin }: { isAdmin: boolean }) {
         </CardHeader>
         <CardContent className="space-y-4">
           <Tabs value={tab} onValueChange={handleTabChange}>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <TabsList>
-                <TabsTrigger value="driver">Motoristas</TabsTrigger>
-                {isAdmin && <TabsTrigger value="manager">Gerentes</TabsTrigger>}
-              </TabsList>
-              <DebounceInput
-                placeholder="Buscar por nome ou e-mail..."
-                defaultValue={search}
-                onDebounce={handleSearch}
-                className="sm:max-w-xs"
-                aria-label="Buscar usuários"
-              />
-            </div>
+            <TabsList>
+              <TabsTrigger value="driver">Motoristas</TabsTrigger>
+              {isAdmin && <TabsTrigger value="manager">Gerentes</TabsTrigger>}
+            </TabsList>
 
             <TabsContent value={tab}>
               {isLoading ? (
                 <div className="flex items-center justify-center py-12">
                   <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent" />
                 </div>
-              ) : users.length === 0 ? (
-                <div className="text-center py-12 text-muted-foreground">
-                  {search.trim()
-                    ? `Nenhum resultado para "${search.trim()}".`
-                    : `Nenhum ${plural.toLowerCase()} cadastrado.`}
-                </div>
               ) : (
-                <>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Nome</TableHead>
-                        <TableHead>E-mail</TableHead>
-                        <TableHead>Telefone</TableHead>
-                        <TableHead>CPF</TableHead>
-                        <TableHead>Perfil</TableHead>
-                        <TableHead className="text-right">Ações</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {users.map((user) => (
-                        <TableRow key={user.id}>
-                          <TableCell className="font-medium">
-                            {user.name}
-                          </TableCell>
-                          <TableCell>{user.email}</TableCell>
-                          <TableCell>{user.phone ?? "—"}</TableCell>
-                          <TableCell className="font-mono">
-                            {user.document ?? "—"}
-                          </TableCell>
-                          <TableCell>
-                            <Badge
-                              variant={
-                                user.role === "driver" ? "secondary" : "default"
-                              }
-                            >
-                              {user.role === "driver"
-                                ? "Motorista"
-                                : user.role === "manager"
-                                  ? "Gerente"
-                                  : "Admin"}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right space-x-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => openEditModal(user)}
-                            >
-                              Editar
-                            </Button>
-                            <Button
-                              variant="destructive"
-                              size="sm"
-                              onClick={() => handleDelete(user)}
-                              disabled={deleteMutation.isPending}
-                            >
-                              Excluir
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-
-                  <div className="flex items-center justify-between pt-4">
-                    <span className="text-sm text-muted-foreground">
-                      {total} resultado{total === 1 ? "" : "s"} — página{" "}
-                      {page + 1} de {totalPages}
-                    </span>
-                    <div className="space-x-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={page === 0}
-                        onClick={() => setPage((p) => Math.max(0, p - 1))}
-                      >
-                        Anterior
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={page + 1 >= totalPages}
-                        onClick={() => setPage((p) => p + 1)}
-                      >
-                        Próxima
-                      </Button>
-                    </div>
-                  </div>
-                </>
+                <DataTable
+                  table={table}
+                  toolbarProps={{
+                    searchPlaceholder: "Buscar por nome ou e-mail...",
+                  }}
+                />
               )}
             </TabsContent>
           </Tabs>
@@ -454,6 +428,39 @@ export function DriversManagement({ isAdmin }: { isAdmin: boolean }) {
           </form>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={userToDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setUserToDelete(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir usuário?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir {userToDelete?.name} (
+              {userToDelete?.email})? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteMutation.isPending}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive hover:bg-destructive/90"
+              disabled={deleteMutation.isPending}
+              onClick={() => {
+                if (userToDelete) {
+                  deleteMutation.mutate({ id: userToDelete.id });
+                }
+              }}
+            >
+              {deleteMutation.isPending ? "Excluindo..." : "Excluir"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

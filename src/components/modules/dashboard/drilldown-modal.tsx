@@ -2,9 +2,7 @@
 
 import { XIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { format } from "date-fns";
-import { ptBR } from "date-fns/locale";
-import { Badge } from "@/components/ui/badge";
+import { DataTable, useAppTable } from "@/components/data-table";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -13,29 +11,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { buildDrilldownColumns, type DrilldownStop } from "./drilldown-columns";
 
-interface DrilldownStop {
-  routeId: string;
-  driverId: string;
-  driverName: string;
-  stopId: string;
-  order: string;
-  pointId: string;
-  pointName: string;
-  address: string;
-  arrivalTime: string | null;
-  departureTime: string | null;
-  dwellMinutes: number;
-  workdayPercentage: number;
-}
+const modalColumns = buildDrilldownColumns(false);
 
 interface DrilldownModalProps {
   open: boolean;
@@ -56,25 +34,13 @@ export function DrilldownModal({
   workdayPercentage,
   onExportCSV,
 }: DrilldownModalProps) {
+  const table = useAppTable({
+    data: stops,
+    columns: modalColumns,
+    getRowId: (row) => row.stopId,
+  });
+
   if (!open) return null;
-
-  const formatTime = (timeStr: string | null) => {
-    if (!timeStr) return "—";
-    try {
-      return format(new Date(timeStr), "HH:mm:ss", { locale: ptBR });
-    } catch {
-      return timeStr;
-    }
-  };
-
-  const formatDate = (timeStr: string | null) => {
-    if (!timeStr) return "—";
-    try {
-      return format(new Date(timeStr), "dd/MM/yyyy", { locale: ptBR });
-    } catch {
-      return timeStr;
-    }
-  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -104,68 +70,13 @@ export function DrilldownModal({
           </div>
         </DialogHeader>
 
-        <div className="mt-4 overflow-x-auto max-h-[calc(80vh-200px)]">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-12 text-center">Ordem</TableHead>
-                <TableHead>Ponto</TableHead>
-                <TableHead>Endereço</TableHead>
-                <TableHead className="w-36 text-center">Data</TableHead>
-                <TableHead className="w-32 text-center">Chegada</TableHead>
-                <TableHead className="w-32 text-center">Saída</TableHead>
-                <TableHead className="w-32 text-center">Tempo Parado</TableHead>
-                <TableHead className="w-32 text-center">% Jornada</TableHead>
-                <TableHead>Motorista</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {stops.map((stop) => (
-                <TableRow key={stop.stopId}>
-                  <TableCell className="text-center font-mono">
-                    {stop.order}
-                  </TableCell>
-                  <TableCell className="font-medium">
-                    {stop.pointName}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">
-                    {stop.address}
-                  </TableCell>
-                  <TableCell className="text-center">
-                    {formatDate(stop.arrivalTime || stop.departureTime)}
-                  </TableCell>
-                  <TableCell className="text-center font-mono">
-                    {formatTime(stop.arrivalTime)}
-                  </TableCell>
-                  <TableCell className="text-center font-mono">
-                    {formatTime(stop.departureTime)}
-                  </TableCell>
-                  <TableCell className="text-center font-mono tabular-nums">
-                    {stop.dwellMinutes} min
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <Badge
-                      variant={
-                        stop.workdayPercentage > 100
-                          ? "destructive"
-                          : "secondary"
-                      }
-                    >
-                      {stop.workdayPercentage.toFixed(1)}%
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-sm">{stop.driverName}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+        <div className="mt-4 max-h-[calc(80vh-220px)] overflow-y-auto">
+          <DataTable
+            table={table}
+            showPagination={false}
+            toolbarProps={{ searchPlaceholder: "Pesquisar paradas..." }}
+          />
         </div>
-
-        {stops.length === 0 && (
-          <div className="flex items-center justify-center h-48 text-muted-foreground">
-            <p>Nenhuma parada com tempo parado neste período.</p>
-          </div>
-        )}
       </DialogContent>
     </Dialog>
   );

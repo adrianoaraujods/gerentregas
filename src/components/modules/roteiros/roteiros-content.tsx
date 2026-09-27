@@ -4,22 +4,41 @@ import { format } from "date-fns";
 import { History, MapIcon, Plus, Trash } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import {
+  createAppColumnHelper,
+  DataTable,
+  useAppTable,
+} from "@/components/data-table";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { api } from "@/lib/api/client";
+import type { RouterOutputs } from "@/server/api/router";
 
 import { RouteDialog } from "./route-dialog";
 import { RouteHistoryDialog } from "./route-history-dialog";
+
+type ClientRoute = RouterOutputs["routes"]["list"]["routes"][number];
+
+const columnHelper = createAppColumnHelper<ClientRoute>();
+
+const ROUTE_STATUS_OPTIONS = [
+  { label: "Rascunho", value: "draft" },
+  { label: "Em andamento", value: "in_flight" },
+  { label: "Concluído", value: "concluded" },
+  { label: "Cancelado", value: "cancelled" },
+];
 
 function formatCurrency(value: number | null | undefined) {
   if (value == null) return "Indeterminado";
@@ -41,11 +60,13 @@ export function RoteirosContent() {
   const [isHistoryDialogOpen, setIsHistoryDialogOpen] = useState(false);
   const [routeHistoryId, setRouteHistoryId] = useState<string | null>(null);
 
+  const [routeToDelete, setRouteToDelete] = useState<ClientRoute | null>(null);
+
   const { data: routesData, isLoading: isLoadingRoutes } =
-    api.routes.list.useQuery({ limit: 100, offset: 0 });
+    api.routes.list.useQuery({ limit: 1000, offset: 0 });
 
   const { data: driversData } = api.drivers.list.useQuery({
-    limit: 100,
+    limit: 1000,
     role: "driver",
   });
   const { data: vehiclesData } = api.fleet.list.useQuery();
@@ -56,32 +77,129 @@ export function RoteirosContent() {
     onSuccess: () => {
       toast.success("Roteiro excluído com sucesso!");
       utils.routes.list.invalidate();
+      setRouteToDelete(null);
     },
     onError: (error: { message: string }) => {
       toast.error(`Erro ao excluir roteiro: ${error.message}`);
     },
   });
 
-  const handleDelete = (id: string) => {
-    if (confirm("Tem certeza que deseja excluir este roteiro?")) {
-      deleteMutation.mutate({ id });
-    }
-  };
-
   const getDriverName = (id: string) => {
-    const driver = driversData?.drivers.find(
-      (d: { id: string; name: string }) => d.id === id,
-    );
+    const driver = driversData?.drivers.find((d) => d.id === id);
     return driver?.name || "Desconhecido";
   };
 
   const getVehiclePlate = (id: string | null | undefined) => {
     if (!id) return "Nenhum";
-    const vehicle = vehiclesData?.find(
-      (v: { id: string; plate: string }) => v.id === id,
-    );
+    const vehicle = vehiclesData?.find((v) => v.id === id);
     return vehicle?.plate || "Desconhecido";
   };
+
+  const routes = routesData?.routes ?? [];
+
+  const table = useAppTable({
+    data: routes,
+    columns: columnHelper.columns([
+      columnHelper.accessor("date", {
+        meta: { variant: "date", label: "Data" },
+        cell: ({ getValue }) => (
+          <span className="font-medium">
+            {format(new Date(getValue()), "dd/MM/yyyy")}
+          </span>
+        ),
+      }),
+      columnHelper.accessor((row) => getDriverName(row.driverId), {
+        id: "motorista",
+        meta: { variant: "text", label: "Motorista" },
+      }),
+      columnHelper.accessor((row) => getVehiclePlate(row.vehicleId), {
+        id: "veiculo",
+        meta: { variant: "text", label: "Veículo" },
+      }),
+      columnHelper.accessor("status", {
+        meta: {
+          variant: "select",
+          label: "Status",
+          options: ROUTE_STATUS_OPTIONS,
+        },
+        cell: ({ getValue }) => {
+          const value = getValue();
+          const label =
+            ROUTE_STATUS_OPTIONS.find((option) => option.value === value)
+              ?.label ?? value;
+          const variant =
+            value === "concluded"
+              ? "default"
+              : value === "in_flight"
+                ? "secondary"
+                : "outline";
+          return <Badge variant={variant}>{label}</Badge>;
+        },
+      }),
+      columnHelper.accessor("distanceKm", {
+        meta: { variant: "number", label: "Distância" },
+        cell: ({ getValue }) => (
+          <span className="font-mono tabular-nums">
+            {formatDistance(getValue())}
+          </span>
+        ),
+      }),
+      columnHelper.accessor("cost", {
+        meta: { variant: "number", label: "Custo" },
+        cell: ({ getValue }) => (
+          <span className="font-mono tabular-nums">
+            {formatCurrency(getValue())}
+          </span>
+        ),
+      }),
+      columnHelper.display({
+        id: "acoes",
+        header: () => <div className="text-right">Ações</div>,
+        cell: ({ row }) => (
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => {
+                setRouteHistoryId(row.original.id);
+                setIsHistoryDialogOpen(true);
+              }}
+              title="Histórico de versões"
+            >
+              <History className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => {
+                setRouteToEditId(row.original.id);
+                setIsDialogOpen(true);
+              }}
+              title="Editar roteiro"
+            >
+              <MapIcon className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-destructive hover:bg-destructive hover:text-destructive-foreground"
+              onClick={() => setRouteToDelete(row.original)}
+              disabled={deleteMutation.isPending}
+              title="Excluir roteiro"
+            >
+              <Trash className="h-4 w-4" />
+            </Button>
+          </div>
+        ),
+        enableSorting: false,
+        enableGrouping: false,
+        enableHiding: false,
+        enableColumnFilter: false,
+      }),
+    ]),
+    getRowId: (row) => row.id,
+    initialState: { pagination: { pageIndex: 0, pageSize: 10 } },
+  });
 
   return (
     <div className="space-y-6">
@@ -108,127 +226,19 @@ export function RoteirosContent() {
           <CardTitle>Roteiros Diários</CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Data</TableHead>
-                <TableHead>Motorista</TableHead>
-                <TableHead>Veículo</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Distância / Custo</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoadingRoutes ? (
-                Array.from({ length: 5 }).map((_, i) => (
-                  // biome-ignore lint/suspicious/noArrayIndexKey: Skeletons are static
-                  <TableRow key={i}>
-                    <TableCell>
-                      <Skeleton className="h-4 w-[100px]" />
-                    </TableCell>
-                    <TableCell>
-                      <Skeleton className="h-4 w-[150px]" />
-                    </TableCell>
-                    <TableCell>
-                      <Skeleton className="h-4 w-[100px]" />
-                    </TableCell>
-                    <TableCell>
-                      <Skeleton className="h-4 w-[80px]" />
-                    </TableCell>
-                    <TableCell>
-                      <Skeleton className="h-4 w-[120px]" />
-                    </TableCell>
-                    <TableCell>
-                      <Skeleton className="h-8 w-16 ml-auto" />
-                    </TableCell>
-                  </TableRow>
-                ))
-              ) : !routesData || routesData.routes.length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={6}
-                    className="text-center py-6 text-muted-foreground"
-                  >
-                    Nenhum roteiro encontrado.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                routesData.routes.map(
-                  (route: {
-                    id: string;
-                    date: string;
-                    driverId: string;
-                    vehicleId: string | null;
-                    status: string;
-                    distanceKm: number | null;
-                    cost: number | null;
-                  }) => (
-                    <TableRow key={route.id}>
-                      <TableCell className="font-medium">
-                        {format(new Date(route.date), "dd/MM/yyyy")}
-                      </TableCell>
-                      <TableCell>{getDriverName(route.driverId)}</TableCell>
-                      <TableCell>{getVehiclePlate(route.vehicleId)}</TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={
-                            route.status === "concluded"
-                              ? "default"
-                              : route.status === "in_flight"
-                                ? "secondary"
-                                : "outline"
-                          }
-                        >
-                          {route.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <span className="text-sm">
-                          {formatDistance(route.distanceKm)} /{" "}
-                          {formatCurrency(route.cost)}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => {
-                            setRouteHistoryId(route.id);
-                            setIsHistoryDialogOpen(true);
-                          }}
-                          title="Histórico de versões"
-                        >
-                          <History className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => {
-                            setRouteToEditId(route.id);
-                            setIsDialogOpen(true);
-                          }}
-                          title="Editar roteiro"
-                        >
-                          <MapIcon className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="text-destructive hover:bg-destructive hover:text-destructive-foreground"
-                          onClick={() => handleDelete(route.id)}
-                          disabled={deleteMutation.isPending}
-                          title="Excluir roteiro"
-                        >
-                          <Trash className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ),
-                )
-              )}
-            </TableBody>
-          </Table>
+          {isLoadingRoutes ? (
+            <div className="space-y-3">
+              {Array.from({ length: 5 }).map((_, i) => (
+                // biome-ignore lint/suspicious/noArrayIndexKey: Skeletons are static
+                <Skeleton key={i} className="h-8 w-full" />
+              ))}
+            </div>
+          ) : (
+            <DataTable
+              table={table}
+              toolbarProps={{ searchPlaceholder: "Pesquisar roteiros..." }}
+            />
+          )}
         </CardContent>
       </Card>
 
@@ -244,6 +254,39 @@ export function RoteirosContent() {
         onOpenChange={setIsHistoryDialogOpen}
         routeId={routeHistoryId}
       />
+
+      <AlertDialog
+        open={routeToDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setRouteToDelete(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir roteiro?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir este roteiro? Esta ação não pode
+              ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteMutation.isPending}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive hover:bg-destructive/90"
+              disabled={deleteMutation.isPending}
+              onClick={() => {
+                if (routeToDelete) {
+                  deleteMutation.mutate({ id: routeToDelete.id });
+                }
+              }}
+            >
+              {deleteMutation.isPending ? "Excluindo..." : "Excluir"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

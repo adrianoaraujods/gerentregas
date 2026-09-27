@@ -238,7 +238,7 @@ describe("SyncService", () => {
 
     it("rejects a timestamp off the route's date", async () => {
       const arrival = new Date(
-        routeDate.getTime() + 24 * 60 * 60 * 1000 + 30 * 60000,
+        routeDate.getTime() - 24 * 60 * 60 * 1000 - 30 * 60000,
       );
       const result = await service.uploadBatch(
         {

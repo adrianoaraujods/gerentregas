@@ -11,6 +11,11 @@ import {
 import { useState } from "react";
 import { toast } from "sonner";
 import {
+  createAppColumnHelper,
+  DataTable,
+  useAppTable,
+} from "@/components/data-table";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -24,19 +29,19 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { api } from "@/lib/api/client";
 import type { RouterOutputs } from "@/server/api/router";
 import { PointDialog } from "./point-dialog";
 
 type ClientPoint = RouterOutputs["points"]["list"]["points"][number];
+
+const columnHelper = createAppColumnHelper<ClientPoint>();
+
+const GEOCODE_STATUS_OPTIONS = [
+  { label: "Localizado", value: "success" },
+  { label: "Falhou", value: "failed" },
+  { label: "Manual", value: "manual" },
+];
 
 export function PontosContent() {
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -45,7 +50,7 @@ export function PontosContent() {
 
   const utils = api.useUtils();
   const { data, isLoading } = api.points.list.useQuery({
-    limit: 100,
+    limit: 1000,
     offset: 0,
     includeDeleted: false,
   });
@@ -69,10 +74,6 @@ export function PontosContent() {
   const handleCreate = () => {
     setPointToEdit(null);
     setDialogOpen(true);
-  };
-
-  const confirmDelete = (point: ClientPoint) => {
-    setPointToDelete(point);
   };
 
   const renderGeocodeStatus = (status: ClientPoint["geocodeStatus"]) => {
@@ -112,6 +113,81 @@ export function PontosContent() {
     }
   };
 
+  const points = data?.points ?? [];
+
+  const table = useAppTable({
+    data: points,
+    columns: columnHelper.columns([
+      columnHelper.accessor("name", {
+        meta: { variant: "text", label: "Nome" },
+        cell: ({ getValue }) => (
+          <span className="font-medium">{getValue()}</span>
+        ),
+      }),
+      columnHelper.accessor("address", {
+        meta: { variant: "text", label: "Endereço" },
+        cell: ({ getValue }) => (
+          <span className="block max-w-xs truncate" title={getValue()}>
+            {getValue()}
+          </span>
+        ),
+      }),
+      columnHelper.accessor("geocodeStatus", {
+        meta: {
+          variant: "select",
+          label: "Status Geocode",
+          options: GEOCODE_STATUS_OPTIONS,
+        },
+        cell: ({ getValue }) => renderGeocodeStatus(getValue()),
+      }),
+      columnHelper.accessor(
+        (row) =>
+          row.latitude && row.longitude
+            ? `${row.latitude.toFixed(4)}, ${row.longitude.toFixed(4)}`
+            : "-",
+        {
+          id: "coordenadas",
+          meta: { variant: "text", label: "Coordenadas" },
+          cell: ({ getValue }) => (
+            <span className="font-mono text-muted-foreground text-sm tabular-nums">
+              {getValue()}
+            </span>
+          ),
+        },
+      ),
+      columnHelper.display({
+        id: "acoes",
+        header: () => <div className="text-right">Ações</div>,
+        cell: ({ row }) => (
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => handleEdit(row.original)}
+              title="Editar"
+            >
+              <Pencil className="h-4 w-4 text-muted-foreground" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setPointToDelete(row.original)}
+              title="Excluir"
+            >
+              <Trash className="h-4 w-4 text-destructive" />
+            </Button>
+          </div>
+        ),
+        enableSorting: false,
+        enableGrouping: false,
+        enableHiding: false,
+        enableColumnFilter: false,
+      }),
+    ]),
+    getRowId: (row) => row.id,
+    initialState: { pagination: { pageIndex: 0, pageSize: 10 } },
+  });
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -132,90 +208,19 @@ export function PontosContent() {
           <CardTitle>Catálogo de Pontos</CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nome</TableHead>
-                <TableHead>Endereço</TableHead>
-                <TableHead>Status Geocode</TableHead>
-                <TableHead>Coordenadas</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                Array.from({ length: 5 }).map((_, i) => (
-                  // biome-ignore lint/suspicious/noArrayIndexKey: Skeletons are static and never reordered
-                  <TableRow key={i}>
-                    <TableCell>
-                      <Skeleton className="h-4 w-[150px]" />
-                    </TableCell>
-                    <TableCell>
-                      <Skeleton className="h-4 w-[250px]" />
-                    </TableCell>
-                    <TableCell>
-                      <Skeleton className="h-4 w-[100px]" />
-                    </TableCell>
-                    <TableCell>
-                      <Skeleton className="h-4 w-[100px]" />
-                    </TableCell>
-                    <TableCell>
-                      <Skeleton className="h-8 w-16 ml-auto" />
-                    </TableCell>
-                  </TableRow>
-                ))
-              ) : !data || data.points.length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={5}
-                    className="text-center py-6 text-muted-foreground"
-                  >
-                    Nenhum ponto cadastrado.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                data.points.map((point) => (
-                  <TableRow key={point.id}>
-                    <TableCell className="font-medium">{point.name}</TableCell>
-                    <TableCell
-                      className="max-w-xs truncate"
-                      title={point.address}
-                    >
-                      {point.address}
-                    </TableCell>
-                    <TableCell>
-                      {renderGeocodeStatus(point.geocodeStatus)}
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-sm">
-                      {point.latitude && point.longitude
-                        ? `${point.latitude.toFixed(4)}, ${point.longitude.toFixed(4)}`
-                        : "-"}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleEdit(point)}
-                          title="Editar"
-                        >
-                          <Pencil className="h-4 w-4 text-muted-foreground" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => confirmDelete(point)}
-                          title="Excluir"
-                        >
-                          <Trash className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+          {isLoading ? (
+            <div className="space-y-3">
+              {Array.from({ length: 5 }).map((_, i) => (
+                // biome-ignore lint/suspicious/noArrayIndexKey: Skeletons are static and never reordered
+                <Skeleton key={i} className="h-8 w-full" />
+              ))}
+            </div>
+          ) : (
+            <DataTable
+              table={table}
+              toolbarProps={{ searchPlaceholder: "Pesquisar pontos..." }}
+            />
+          )}
         </CardContent>
       </Card>
 
