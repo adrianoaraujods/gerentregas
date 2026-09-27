@@ -189,7 +189,7 @@ draft ──▶ in_flight ──▶ concluded
 | --- | --- |
 | Datas | `timestamp` sem fuso (`date`, `created_at`, `arrival_at`, `departure_at`, `deleted_at`); consultas por dia usam intervalo `[00:00:00, 23:59:59.999]` |
 | Valores por unidade | Centésimos para evitar ponto flutuante: `km_per_liter_hundredths`, `distance_km_hundredths`; centavos para dinheiro: `fuel_price_per_liter` e o custo calculado (`src/server/lib/money.ts`, `src/server/modules/routes/cost.ts`) |
-| Exclusão lógica | `deleted_at` em `user`, `point`, `vehicle`, `route`, `stop`; listagens filtram por `deleted_at IS NULL`; restauração define `deleted_at = NULL` |
+| Exclusão lógica | `deleted_at` em `user`, `point`, `vehicle`, `route`, `stop`; listagens filtram por `deleted_at IS NULL` por padrão. `user` e `vehicle` distinguem dois casos (ADR 0004): registros sem histórico (`route`, `route_version`, `stop_version.actor_id`) são excluídos permanentemente; com histórico são **arquivados** — o usuário arquivado também recebe `banned = true` e tem as sessões revogadas. Listagens de frota e usuários aceitam `includeDeleted` e a restauração define `deleted_at = NULL` (e `banned = false` para usuários) |
 | `updated_at` | `defaultNow()` com `$onUpdate(() => new Date())` |
 | Snapshot | `stop` e `stop_version` guardam `address_snapshot`, `latitude_snapshot`, `longitude_snapshot`, preservando o trajeto original mesmo que o ponto seja alterado |
 | Conclusão | Não existe coluna de conclusão: derivada de `departure_at IS NOT NULL` (ADR 0003); a coluna `concluded_at` foi removida pela migração `20260924120331_cultured_giant_man` |

@@ -1,21 +1,30 @@
-import { ConflictError, NotFoundError } from "@/server/api";
+import { BadRequestError, ConflictError, NotFoundError } from "@/server/api";
 
 import type { FleetRepository } from "./fleet.repository";
-import type { CreateVehicleInput, UpdateVehicleInput } from "./fleet.types";
+import type {
+  CreateVehicleInput,
+  DeleteVehicleOutput,
+  UpdateVehicleInput,
+} from "./fleet.types";
 import {
   createVehicleInputSchema,
   updateVehicleInputSchema,
 } from "./fleet.types";
 
+const ARCHIVED_PLATE_MESSAGE =
+  "Já existe um veículo arquivado com esta placa. Restaure-o na listagem da frota.";
+
+const LIVE_PLATE_MESSAGE = "Já existe um veículo cadastrado com esta placa.";
+
 export class FleetService {
   constructor(private readonly repository: FleetRepository) {}
 
-  async list(input?: { activeOnly?: boolean }) {
+  async list(input?: { activeOnly?: boolean; includeDeleted?: boolean }) {
     return this.repository.findMany(input);
   }
 
   async getById(id: string) {
-    const v = await this.repository.findById(id);
+    const v = await this.repository.findByIdIncludingDeleted(id);
     if (!v) {
       throw new NotFoundError("Veículo não encontrado.");
     }
@@ -25,10 +34,10 @@ export class FleetService {
   async create(input: CreateVehicleInput) {
     const validated = createVehicleInputSchema.parse(input);
     const plate = validated.plate.toUpperCase();
-    const existing = await this.repository.findByPlate(plate);
+    const existing = await this.repository.findByPlateIncludingDeleted(plate);
     if (existing) {
       throw new ConflictError(
-        "Já existe um veículo cadastrado com esta placa.",
+        existing.deletedAt ? ARCHIVED_PLATE_MESSAGE : LIVE_PLATE_MESSAGE,
       );
     }
 
@@ -50,10 +59,12 @@ export class FleetService {
     }
 
     if (plate !== current.plate.toUpperCase()) {
-      const existing = await this.repository.findByPlate(plate);
+      const existing = await this.repository.findByPlateIncludingDeleted(plate);
       if (existing && existing.id !== validated.id) {
         throw new ConflictError(
-          "Já existe outro veículo cadastrado com esta placa.",
+          existing.deletedAt
+            ? ARCHIVED_PLATE_MESSAGE
+            : "Já existe outro veículo cadastrado com esta placa.",
         );
       }
     }
@@ -72,11 +83,40 @@ export class FleetService {
     return updated;
   }
 
-  async delete(id: string) {
-    const success = await this.repository.softDelete(id);
+  async delete(id: string): Promise<DeleteVehicleOutput> {
+    const existing = await this.repository.findById(id);
+    if (!existing) {
+      throw new NotFoundError("Veículo não encontrado.");
+    }
+
+    if (await this.repository.hasRouteHistory(id)) {
+      const success = await this.repository.softDelete(id);
+      if (!success) {
+        throw new NotFoundError("Veículo não encontrado.");
+      }
+      return { success: true, result: "archived" };
+    }
+
+    const success = await this.repository.hardDelete(id);
     if (!success) {
       throw new NotFoundError("Veículo não encontrado.");
     }
-    return { success: true };
+    return { success: true, result: "deleted" };
+  }
+
+  async restore(id: string) {
+    const existing = await this.repository.findByIdIncludingDeleted(id);
+    if (!existing) {
+      throw new NotFoundError("Veículo não encontrado.");
+    }
+    if (!existing.deletedAt) {
+      throw new BadRequestError("Veículo não está arquivado.");
+    }
+
+    const restored = await this.repository.restore(id);
+    if (!restored) {
+      throw new NotFoundError("Veículo não encontrado.");
+    }
+    return restored;
   }
 }

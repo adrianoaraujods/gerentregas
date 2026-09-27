@@ -1,15 +1,20 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNotNull, isNull } from "drizzle-orm";
 
 import type { Database } from "@/server/db";
 import { vehicle } from "@/server/db/schemas/fleet";
+import { route, routeVersion } from "@/server/db/schemas/routes";
 
 import type { NewVehicle } from "./fleet.types";
 
 export class FleetRepository {
   constructor(private readonly db: Database) {}
 
-  async findMany(options?: { activeOnly?: boolean }) {
-    const conditions = [isNull(vehicle.deletedAt)];
+  async findMany(options?: { activeOnly?: boolean; includeDeleted?: boolean }) {
+    const conditions = [];
+
+    if (!options?.includeDeleted) {
+      conditions.push(isNull(vehicle.deletedAt));
+    }
 
     if (options?.activeOnly) {
       conditions.push(eq(vehicle.active, true));
@@ -31,6 +36,16 @@ export class FleetRepository {
     return row || null;
   }
 
+  async findByIdIncludingDeleted(id: string) {
+    const [row] = await this.db
+      .select()
+      .from(vehicle)
+      .where(eq(vehicle.id, id))
+      .limit(1);
+
+    return row || null;
+  }
+
   async findByPlate(plate: string) {
     const [row] = await this.db
       .select()
@@ -39,6 +54,32 @@ export class FleetRepository {
       .limit(1);
 
     return row || null;
+  }
+
+  async findByPlateIncludingDeleted(plate: string) {
+    const [row] = await this.db
+      .select()
+      .from(vehicle)
+      .where(eq(vehicle.plate, plate))
+      .limit(1);
+
+    return row || null;
+  }
+
+  async hasRouteHistory(id: string) {
+    const [routeRef] = await this.db
+      .select({ id: route.id })
+      .from(route)
+      .where(eq(route.vehicleId, id))
+      .limit(1);
+    if (routeRef) return true;
+
+    const [versionRef] = await this.db
+      .select({ id: routeVersion.id })
+      .from(routeVersion)
+      .where(eq(routeVersion.vehicleId, id))
+      .limit(1);
+    return !!versionRef;
   }
 
   async create(input: NewVehicle) {
@@ -85,5 +126,24 @@ export class FleetRepository {
       .returning();
 
     return !!row;
+  }
+
+  async hardDelete(id: string) {
+    const [row] = await this.db
+      .delete(vehicle)
+      .where(and(eq(vehicle.id, id), isNull(vehicle.deletedAt)))
+      .returning();
+
+    return !!row;
+  }
+
+  async restore(id: string) {
+    const [row] = await this.db
+      .update(vehicle)
+      .set({ deletedAt: null, updatedAt: new Date() })
+      .where(and(eq(vehicle.id, id), isNotNull(vehicle.deletedAt)))
+      .returning();
+
+    return row || null;
   }
 }

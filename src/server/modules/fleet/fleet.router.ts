@@ -18,7 +18,9 @@ export const fleetRouter = createRouter({
     .query(({ ctx: { db, session }, input }) => {
       const isManager =
         session.user.role === "manager" || session.user.role === "admin";
-      const safeInput = isManager ? input : { ...input, activeOnly: true };
+      const safeInput = isManager
+        ? input
+        : { ...input, activeOnly: true, includeDeleted: false };
       return new FleetController(db).list(safeInput);
     }),
 
@@ -44,5 +46,11 @@ export const fleetRouter = createRouter({
     .input(z.object({ id: z.string() }))
     .mutation(({ ctx: { db }, input }) =>
       new FleetController(db).delete(input.id),
+    ),
+
+  restore: managerProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(({ ctx: { db }, input }) =>
+      new FleetController(db).restore(input.id),
     ),
 });

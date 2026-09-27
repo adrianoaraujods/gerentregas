@@ -2,8 +2,27 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { ConflictError, NotFoundError } from "@/server/api";
 import { db } from "@/server/db";
+import { user as userTable } from "@/server/db/schemas/auth";
+import { route, routeVersion } from "@/server/db/schemas/routes";
 import { FleetRepository } from "@/server/modules/fleet/fleet.repository";
 import { FleetService } from "@/server/modules/fleet/fleet.service";
+
+let routeUserCounter = 0;
+
+async function seedRouteUser(role: "manager" | "driver") {
+  routeUserCounter += 1;
+  const [row] = await db
+    .insert(userTable)
+    .values({
+      id: crypto.randomUUID(),
+      name: `Route ${role} ${routeUserCounter}`,
+      email: `route-${role}-${routeUserCounter}-${crypto.randomUUID()}@test.com`,
+      emailVerified: true,
+      role,
+    })
+    .returning();
+  return row;
+}
 
 describe("FleetService", () => {
   let repository: FleetRepository;
@@ -165,21 +184,166 @@ describe("FleetService", () => {
     });
   });
 
-  describe("softDelete", () => {
-    it("marks vehicle as soft-deleted and excludes it from list and getById", async () => {
+  describe("delete", () => {
+    it("permanently deletes an unused vehicle", async () => {
       const created = await service.create({
         plate: "DEL-7777",
         model: "Para Deletar",
         kmPerLiter: 15.0,
       });
 
-      const delResult = await service.delete(created.id);
-      expect(delResult.success).toBe(true);
+      const result = await service.delete(created.id);
+      expect(result).toEqual({ success: true, result: "deleted" });
 
       await expect(service.getById(created.id)).rejects.toThrow(NotFoundError);
 
       const list = await service.list();
       expect(list.some((v) => v.id === created.id)).toBe(false);
+
+      const includingDeleted = await service.list({ includeDeleted: true });
+      expect(includingDeleted.some((v) => v.id === created.id)).toBe(false);
+    });
+
+    it("archives a vehicle referenced by a route", async () => {
+      const created = await service.create({
+        plate: "ARC-0001",
+        model: "Usado em roteiro",
+        kmPerLiter: 10.0,
+      });
+
+      const manager = await seedRouteUser("manager");
+      const driver = await seedRouteUser("driver");
+      await db.insert(route).values({
+        id: crypto.randomUUID(),
+        managerId: manager.id,
+        driverId: driver.id,
+        vehicleId: created.id,
+        date: new Date(),
+      });
+
+      const result = await service.delete(created.id);
+      expect(result).toEqual({ success: true, result: "archived" });
+
+      const found = await service.getById(created.id);
+      expect(found.deletedAt).toBeTruthy();
+
+      const live = await service.list();
+      expect(live.some((v) => v.id === created.id)).toBe(false);
+
+      const includingDeleted = await service.list({ includeDeleted: true });
+      const archived = includingDeleted.find((v) => v.id === created.id);
+      expect(archived?.deletedAt).toBeTruthy();
+    });
+
+    it("archives a vehicle referenced only by a route version", async () => {
+      const created = await service.create({
+        plate: "ARV-0002",
+        model: "Usado em versão antiga",
+        kmPerLiter: 10.0,
+      });
+
+      const manager = await seedRouteUser("manager");
+      const driver = await seedRouteUser("driver");
+      const [routeRow] = await db
+        .insert(route)
+        .values({
+          id: crypto.randomUUID(),
+          managerId: manager.id,
+          driverId: driver.id,
+          vehicleId: null,
+          date: new Date(),
+        })
+        .returning();
+      await db.insert(routeVersion).values({
+        id: crypto.randomUUID(),
+        routeId: routeRow.id,
+        version: "1",
+        managerId: manager.id,
+        driverId: driver.id,
+        vehicleId: created.id,
+        date: new Date(),
+        status: "draft",
+      });
+
+      const result = await service.delete(created.id);
+      expect(result).toEqual({ success: true, result: "archived" });
+    });
+
+    it("rejects re-creating the plate of an archived vehicle with a friendly error", async () => {
+      const created = await service.create({
+        plate: "DUP-ARC1",
+        model: "Arquivado",
+        kmPerLiter: 10.0,
+      });
+
+      const manager = await seedRouteUser("manager");
+      const driver = await seedRouteUser("driver");
+      await db.insert(route).values({
+        id: crypto.randomUUID(),
+        managerId: manager.id,
+        driverId: driver.id,
+        vehicleId: created.id,
+        date: new Date(),
+      });
+      await service.delete(created.id);
+
+      await expect(
+        service.create({
+          plate: "DUP-ARC1",
+          model: "Tentativa de recriar",
+          kmPerLiter: 12.0,
+        }),
+      ).rejects.toThrow(/arquivado/);
+    });
+
+    it("throws NotFoundError when vehicle does not exist", async () => {
+      await expect(service.delete("invalid-id-xyz")).rejects.toThrow(
+        NotFoundError,
+      );
+    });
+  });
+
+  describe("restore", () => {
+    it("restores an archived vehicle", async () => {
+      const created = await service.create({
+        plate: "RES-0001",
+        model: "Para Restaurar",
+        kmPerLiter: 10.0,
+      });
+
+      const manager = await seedRouteUser("manager");
+      const driver = await seedRouteUser("driver");
+      await db.insert(route).values({
+        id: crypto.randomUUID(),
+        managerId: manager.id,
+        driverId: driver.id,
+        vehicleId: created.id,
+        date: new Date(),
+      });
+      await service.delete(created.id);
+
+      const restored = await service.restore(created.id);
+      expect(restored.id).toBe(created.id);
+      expect(restored.deletedAt).toBeNull();
+
+      const live = await service.list();
+      expect(live.some((v) => v.id === created.id)).toBe(true);
+    });
+
+    it("rejects restoring a vehicle that is not archived", async () => {
+      const created = await service.create({
+        plate: "RES-0002",
+        model: "Ativo",
+        kmPerLiter: 10.0,
+      });
+
+      await expect(service.restore(created.id)).rejects.toThrow();
+    });
+
+    it("throws NotFoundError for non-existent vehicle", async () => {
+      await expect(service.restore("invalid-id-xyz")).rejects.toThrow(
+        NotFoundError,
+      );
     });
   });
 });

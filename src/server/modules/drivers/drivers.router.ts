@@ -54,15 +54,18 @@ export const driversRouter = createRouter({
 
   delete: managerProcedure
     .input(z.object({ id: z.string() }))
-    .mutation(({ ctx: { db }, input }) =>
-      createController(db).deleteDriver(input.id),
+    .mutation(({ ctx: { db, session }, input }) =>
+      createController(db).deleteDriver(
+        input.id,
+        session.user.role === "admin",
+      ),
     ),
 
-  restore: adminProcedure
+  restore: managerProcedure
     .input(z.object({ id: z.string() }))
-    .mutation(({ ctx: { db }, input }) =>
+    .mutation(({ ctx: { db, session }, input }) =>
       createController(db)
-        .restoreDriver(input.id)
+        .restoreDriver(input.id, session.user.role === "admin")
         .then(driverOutputSchema.parse),
     ),
 });

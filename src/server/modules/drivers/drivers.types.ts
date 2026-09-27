@@ -25,6 +25,7 @@ export const driverOutputSchema = userSchema.pick({
   phone: true,
   document: true,
   role: true,
+  deletedAt: true,
   createdAt: true,
   updatedAt: true,
 });
@@ -59,6 +60,7 @@ export const listDriversInputSchema = z.object({
   offset: z.number().int().nonnegative().default(0),
   role: userRoleSchema.optional(),
   search: z.string().trim().max(100).optional(),
+  includeDeleted: z.boolean().optional().default(false),
 });
 export type ListDriversInput = z.infer<typeof listDriversInputSchema>;
 
@@ -67,3 +69,12 @@ export const driversListOutputSchema = z.object({
   total: z.number().int().nonnegative(),
 });
 export type DriversListOutput = z.infer<typeof driversListOutputSchema>;
+
+export const userDeleteResultSchema = z.enum(["archived", "deleted"]);
+export type UserDeleteResult = z.infer<typeof userDeleteResultSchema>;
+
+export const deleteUserOutputSchema = z.object({
+  success: z.literal(true),
+  result: userDeleteResultSchema,
+});
+export type DeleteUserOutput = z.infer<typeof deleteUserOutputSchema>;

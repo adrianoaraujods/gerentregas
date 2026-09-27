@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import {
   createAppColumnHelper,
   DataTable,
+  type ExtendedColumnFilter,
   useAppTable,
 } from "@/components/data-table";
 import {
@@ -46,6 +47,13 @@ const columnHelper = createAppColumnHelper<VehicleOutput>();
 const STATUS_OPTIONS = [
   { label: "Ativo", value: "ativo" },
   { label: "Inativo", value: "inativo" },
+  { label: "Arquivado", value: "arquivado" },
+];
+
+const ARCHIVED_STATUS = STATUS_OPTIONS[2].value;
+
+const defaultStatusFilter: ExtendedColumnFilter[] = [
+  { id: "status", operator: "notEquals", value: ARCHIVED_STATUS },
 ];
 
 export function FrotaContent() {
@@ -67,6 +75,7 @@ export function FrotaContent() {
 
   const { data: vehicles = [], isLoading } = api.fleet.list.useQuery({
     activeOnly: false,
+    includeDeleted: true,
   });
 
   const createMutation = api.fleet.create.useMutation({
@@ -92,13 +101,27 @@ export function FrotaContent() {
   });
 
   const deleteMutation = api.fleet.delete.useMutation({
-    onSuccess: () => {
-      toast.success("Veículo desativado com sucesso!");
+    onSuccess: (data) => {
+      toast.success(
+        data.result === "archived"
+          ? "Veículo arquivado com sucesso! Ele permanece no histórico pois está vinculado a roteiros — remova o filtro de status para vê-lo e restaurá-lo."
+          : "Veículo excluído permanentemente.",
+      );
       utils.fleet.list.invalidate();
       setVehicleToDelete(null);
     },
     onError: (err) => {
-      toast.error(err.message || "Erro ao desativar veículo");
+      toast.error(err.message || "Erro ao excluir veículo");
+    },
+  });
+
+  const restoreMutation = api.fleet.restore.useMutation({
+    onSuccess: () => {
+      toast.success("Veículo restaurado com sucesso!");
+      utils.fleet.list.invalidate();
+    },
+    onError: (err) => {
+      toast.error(err.message || "Erro ao restaurar veículo");
     },
   });
 
@@ -177,7 +200,11 @@ export function FrotaContent() {
       }),
       columnHelper.accessor(
         (row) =>
-          row.active ? STATUS_OPTIONS[0].value : STATUS_OPTIONS[1].value,
+          row.deletedAt
+            ? ARCHIVED_STATUS
+            : row.active
+              ? STATUS_OPTIONS[0].value
+              : STATUS_OPTIONS[1].value,
         {
           id: "status",
           meta: {
@@ -185,12 +212,16 @@ export function FrotaContent() {
             label: "Status",
             options: STATUS_OPTIONS,
           },
-          cell: ({ getValue }) =>
-            getValue() === STATUS_OPTIONS[0].value ? (
+          cell: ({ getValue }) => {
+            if (getValue() === ARCHIVED_STATUS) {
+              return <Badge variant="outline">Arquivado</Badge>;
+            }
+            return getValue() === STATUS_OPTIONS[0].value ? (
               <Badge variant="default">Ativo</Badge>
             ) : (
               <Badge variant="secondary">Inativo</Badge>
-            ),
+            );
+          },
         },
       ),
       columnHelper.display({
@@ -198,20 +229,33 @@ export function FrotaContent() {
         header: () => <div className="text-right">Ações</div>,
         cell: ({ row }) => (
           <div className="flex justify-end gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => openEditModal(row.original)}
-            >
-              Editar
-            </Button>
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={() => setVehicleToDelete(row.original)}
-            >
-              Excluir
-            </Button>
+            {row.original.deletedAt ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => restoreMutation.mutate({ id: row.original.id })}
+                disabled={restoreMutation.isPending}
+              >
+                Restaurar
+              </Button>
+            ) : (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => openEditModal(row.original)}
+                >
+                  Editar
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setVehicleToDelete(row.original)}
+                >
+                  Excluir
+                </Button>
+              </>
+            )}
           </div>
         ),
         enableSorting: false,
@@ -221,7 +265,10 @@ export function FrotaContent() {
       }),
     ]),
     getRowId: (row) => row.id,
-    initialState: { pagination: { pageIndex: 0, pageSize: 10 } },
+    initialState: {
+      pagination: { pageIndex: 0, pageSize: 10 },
+      columnFilters: defaultStatusFilter,
+    },
   });
 
   const isSubmitting = createMutation.isPending || updateMutation.isPending;
@@ -233,8 +280,9 @@ export function FrotaContent() {
           <div>
             <CardTitle>Gestão de Frota</CardTitle>
             <CardDescription>
-              Cadastre e gerencie a disponibilidade dos veículos utilizados nos
-              roteiros.
+              Cadastre e gerencie os veículos utilizados nos roteiros. Veículos
+              arquivados ficam ocultos por padrão — remova o filtro de status
+              para visualizá-los.
             </CardDescription>
           </div>
           <Button onClick={openCreateModal}>+ Novo Veículo</Button>
@@ -346,13 +394,15 @@ export function FrotaContent() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Remover veículo</AlertDialogTitle>
+            <AlertDialogTitle>Excluir veículo</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja remover/desativar o veículo{" "}
+              Tem certeza que deseja excluir o veículo{" "}
               <span className="font-mono font-bold">
                 {vehicleToDelete?.plate}
               </span>
-              ? Esta ação não pode ser desfeita.
+              ? Se ele não estiver vinculado a nenhum roteiro, será excluído
+              permanentemente. Caso contrário, será arquivado (podendo ser
+              restaurado depois).
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

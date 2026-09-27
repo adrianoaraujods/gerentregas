@@ -8,6 +8,7 @@ import { z } from "zod";
 import {
   createAppColumnHelper,
   DataTable,
+  type ExtendedColumnFilter,
   useAppTable,
 } from "@/components/data-table";
 import { useAppForm } from "@/components/hooks/use-app-form";
@@ -52,6 +53,17 @@ const ROLE_OPTIONS = [
   { label: "Motorista", value: "driver" },
   { label: "Gerente", value: "manager" },
   { label: "Admin", value: "admin" },
+];
+
+const USER_STATUS_OPTIONS = [
+  { label: "Ativo", value: "ativo" },
+  { label: "Arquivado", value: "arquivado" },
+];
+
+const ARCHIVED_STATUS = USER_STATUS_OPTIONS[1].value;
+
+const defaultStatusFilter: ExtendedColumnFilter[] = [
+  { id: "status", operator: "notEquals", value: ARCHIVED_STATUS },
 ];
 
 type ManagedUser = RouterOutputs["drivers"]["list"]["drivers"][number];
@@ -244,6 +256,7 @@ export function DriversManagement({ isAdmin }: { isAdmin: boolean }) {
       limit: 1000,
       offset: 0,
       role: tab,
+      includeDeleted: true,
     },
     { placeholderData: keepPreviousData },
   );
@@ -290,13 +303,27 @@ export function DriversManagement({ isAdmin }: { isAdmin: boolean }) {
   });
 
   const deleteMutation = api.drivers.delete.useMutation({
-    onSuccess: () => {
-      toast.success("Usuário excluído com sucesso!");
+    onSuccess: (data) => {
+      toast.success(
+        data.result === "archived"
+          ? "Usuário arquivado com sucesso! Ele permanece no histórico pois possui roteiros vinculados — remova o filtro de status para vê-lo e restaurá-lo. O acesso dele foi bloqueado."
+          : "Usuário excluído permanentemente.",
+      );
       invalidate();
       setUserToDelete(null);
     },
     onError: (err) => {
       toast.error(err.message || "Erro ao excluir usuário");
+    },
+  });
+
+  const restoreMutation = api.drivers.restore.useMutation({
+    onSuccess: () => {
+      toast.success("Usuário restaurado com sucesso!");
+      invalidate();
+    },
+    onError: (err) => {
+      toast.error(err.message || "Erro ao restaurar usuário");
     },
   });
 
@@ -380,26 +407,53 @@ export function DriversManagement({ isAdmin }: { isAdmin: boolean }) {
           );
         },
       }),
+      columnHelper.accessor((row) => (row.deletedAt ? "arquivado" : "ativo"), {
+        id: "status",
+        meta: {
+          variant: "select",
+          label: "Status",
+          options: USER_STATUS_OPTIONS,
+        },
+        cell: ({ getValue }) =>
+          getValue() === ARCHIVED_STATUS ? (
+            <Badge variant="outline">Arquivado</Badge>
+          ) : (
+            <Badge variant="default">Ativo</Badge>
+          ),
+      }),
       columnHelper.display({
         id: "acoes",
         header: () => <div className="text-right">Ações</div>,
         cell: ({ row }) => (
           <div className="flex justify-end gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => openEditModal(row.original)}
-            >
-              Editar
-            </Button>
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={() => setUserToDelete(row.original)}
-              disabled={deleteMutation.isPending}
-            >
-              Excluir
-            </Button>
+            {row.original.deletedAt ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => restoreMutation.mutate({ id: row.original.id })}
+                disabled={restoreMutation.isPending}
+              >
+                Restaurar
+              </Button>
+            ) : (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => openEditModal(row.original)}
+                >
+                  Editar
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setUserToDelete(row.original)}
+                  disabled={deleteMutation.isPending}
+                >
+                  Excluir
+                </Button>
+              </>
+            )}
           </div>
         ),
         enableSorting: false,
@@ -409,7 +463,10 @@ export function DriversManagement({ isAdmin }: { isAdmin: boolean }) {
       }),
     ]),
     getRowId: (row) => row.id,
-    initialState: { pagination: { pageIndex: 0, pageSize: 10 } },
+    initialState: {
+      pagination: { pageIndex: 0, pageSize: 10 },
+      columnFilters: defaultStatusFilter,
+    },
   });
 
   const isSubmitting =
@@ -481,7 +538,10 @@ export function DriversManagement({ isAdmin }: { isAdmin: boolean }) {
             <AlertDialogTitle>Excluir usuário?</AlertDialogTitle>
             <AlertDialogDescription>
               Tem certeza que deseja excluir {userToDelete?.name} (
-              {userToDelete?.email})? Esta ação não pode ser desfeita.
+              {userToDelete?.email})? Se não houver roteiros vinculados, o
+              usuário será excluído permanentemente. Caso contrário, será
+              arquivado (podendo ser restaurado depois) e o acesso dele será
+              bloqueado imediatamente.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

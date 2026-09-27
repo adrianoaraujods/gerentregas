@@ -5,13 +5,18 @@ import {
   eq,
   ilike,
   inArray,
+  isNotNull,
   isNull,
   or,
   sql,
 } from "drizzle-orm";
 import { auth } from "@/lib/auth";
-import type { Database } from "@/server/db";
-import { user as userTable } from "@/server/db/schemas/auth";
+import type { Database, Transaction } from "@/server/db";
+import {
+  session as sessionTable,
+  user as userTable,
+} from "@/server/db/schemas/auth";
+import { route, routeVersion, stopVersion } from "@/server/db/schemas/routes";
 import { decrypt, encrypt } from "@/server/lib/crypto";
 import type {
   DriverOutput,
@@ -20,6 +25,8 @@ import type {
   UserRole,
   UserWithDeletedAt,
 } from "./drivers.types";
+
+const ARCHIVE_BAN_REASON = "Conta arquivada";
 
 export class DriversRepository {
   constructor(private readonly db: Database) {}
@@ -109,6 +116,15 @@ export class DriversRepository {
     return row ? this.toDomain(row) : null;
   }
 
+  async findByEmailIncludingDeleted(email: string) {
+    const [row] = await this.db
+      .select()
+      .from(userTable)
+      .where(sql`lower(${userTable.email}) = ${email.toLowerCase()}`)
+      .limit(1);
+    return row ? this.toDomainWithDeletedAt(row) : null;
+  }
+
   async list(input: ListDriversInput, isAdmin = false) {
     const trimmedSearch = input.search?.trim();
     const allowedRoles: UserRole[] = isAdmin
@@ -119,7 +135,7 @@ export class DriversRepository {
         ? (input.role as UserRole)
         : undefined;
     const where = and(
-      isNull(userTable.deletedAt),
+      input.includeDeleted ? undefined : isNull(userTable.deletedAt),
       roleFilter
         ? eq(userTable.role, roleFilter)
         : inArray(userTable.role, [...allowedRoles]),
@@ -168,10 +184,50 @@ export class DriversRepository {
     return row ? this.toDomainWithDecryptedDocument(row) : null;
   }
 
-  async softDelete(id: User["id"]) {
+  async hasRouteHistory(id: User["id"]) {
+    const [routeRef] = await this.db
+      .select({ id: route.id })
+      .from(route)
+      .where(or(eq(route.driverId, id), eq(route.managerId, id)))
+      .limit(1);
+    if (routeRef) return true;
+
+    const [versionRef] = await this.db
+      .select({ id: routeVersion.id })
+      .from(routeVersion)
+      .where(or(eq(routeVersion.driverId, id), eq(routeVersion.managerId, id)))
+      .limit(1);
+    if (versionRef) return true;
+
+    const [actorRef] = await this.db
+      .select({ id: stopVersion.id })
+      .from(stopVersion)
+      .where(eq(stopVersion.actorId, id))
+      .limit(1);
+    return !!actorRef;
+  }
+
+  async archive(id: User["id"]) {
+    const [row] = await this.db.transaction(async (tx: Transaction) => {
+      await tx.delete(sessionTable).where(eq(sessionTable.userId, id));
+
+      return tx
+        .update(userTable)
+        .set({
+          deletedAt: new Date(),
+          banned: true,
+          banReason: ARCHIVE_BAN_REASON,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(userTable.id, id), isNull(userTable.deletedAt)))
+        .returning();
+    });
+    return row ? this.toDomain(row) : null;
+  }
+
+  async hardDelete(id: User["id"]) {
     const [row] = await this.db
-      .update(userTable)
-      .set({ deletedAt: new Date() })
+      .delete(userTable)
       .where(and(eq(userTable.id, id), isNull(userTable.deletedAt)))
       .returning();
     return row ? this.toDomain(row) : null;
@@ -180,8 +236,13 @@ export class DriversRepository {
   async restore(id: User["id"]) {
     const [row] = await this.db
       .update(userTable)
-      .set({ deletedAt: null })
-      .where(and(eq(userTable.id, id), sql`${userTable.deletedAt} IS NOT NULL`))
+      .set({
+        deletedAt: null,
+        banned: false,
+        banReason: null,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(userTable.id, id), isNotNull(userTable.deletedAt)))
       .returning();
     return row ? this.toDomain(row) : null;
   }
@@ -203,6 +264,7 @@ export class DriversRepository {
       phone: row.phone,
       document: this.maskDocument(row.document),
       role: row.role,
+      deletedAt: row.deletedAt,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
     };

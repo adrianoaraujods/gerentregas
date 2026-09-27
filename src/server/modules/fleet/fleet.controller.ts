@@ -4,6 +4,7 @@ import { FleetRepository } from "./fleet.repository";
 import { FleetService } from "./fleet.service";
 import type {
   CreateVehicleInput,
+  DeleteVehicleOutput,
   ListVehiclesInput,
   UpdateVehicleInput,
   VehicleOutput,
@@ -33,7 +34,11 @@ export class FleetController {
     return vehicleOutputSchema.parse(await this.service.update(input));
   }
 
-  async delete(id: string): Promise<{ success: boolean }> {
+  async delete(id: string): Promise<DeleteVehicleOutput> {
     return this.service.delete(id);
+  }
+
+  async restore(id: string): Promise<VehicleOutput> {
+    return vehicleOutputSchema.parse(await this.service.restore(id));
   }
 }

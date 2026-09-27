@@ -42,6 +42,8 @@ export const auth = betterAuth({
     admin({
       defaultRole: USER_ROLES[0],
       adminRoles: USER_ROLES[2],
+      bannedUserMessage:
+        "Esta conta foi arquivada. Entre em contato com um gerente ou administrador para reativá-la.",
     }),
     i18n({
       defaultLocale: "pt",

@@ -1,5 +1,6 @@
+import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
-
+import { auth } from "@/lib/auth";
 import {
   BadRequestError,
   ConflictError,
@@ -10,6 +11,11 @@ import {
 import { appRouter } from "@/server/api/router";
 import { createCallerFactory } from "@/server/api/trpc";
 import { db } from "@/server/db";
+import {
+  session as sessionTable,
+  user as userTable,
+} from "@/server/db/schemas/auth";
+import { route } from "@/server/db/schemas/routes";
 
 const createCaller = createCallerFactory(appRouter);
 
@@ -59,6 +65,41 @@ function createTestCaller(role: "admin" | "manager" | "driver") {
   };
 
   return createCaller({ db, session, headers: new Headers() });
+}
+
+let routeSeedCounter = 0;
+
+async function seedRouteReferencing(
+  driverId: string,
+  managerId?: string,
+): Promise<string> {
+  routeSeedCounter += 1;
+  let resolvedManagerId = managerId;
+  if (!resolvedManagerId) {
+    const [manager] = await db
+      .insert(userTable)
+      .values({
+        id: crypto.randomUUID(),
+        name: `Route Manager ${routeSeedCounter}`,
+        email: `route-manager-${routeSeedCounter}-${crypto.randomUUID()}@test.com`,
+        emailVerified: true,
+        role: "manager",
+      })
+      .returning();
+    resolvedManagerId = manager.id;
+  }
+
+  const [routeRow] = await db
+    .insert(route)
+    .values({
+      id: crypto.randomUUID(),
+      managerId: resolvedManagerId,
+      driverId,
+      date: new Date(),
+    })
+    .returning();
+
+  return routeRow.id;
 }
 
 describe("drivers router", () => {
@@ -241,7 +282,7 @@ describe("drivers router", () => {
       expect(result.total).toBe(2);
     });
 
-    it("excludes soft-deleted drivers from list", async () => {
+    it("excludes archived drivers from list unless includeDeleted is set", async () => {
       const driver = await managerCaller.drivers.create({
         name: "Driver 1",
         email: "driver1@test.com",
@@ -250,11 +291,21 @@ describe("drivers router", () => {
         document: "11111111111",
       });
 
+      await seedRouteReferencing(driver.id);
       await managerCaller.drivers.delete({ id: driver.id });
 
       const result = await managerCaller.drivers.list({ limit: 10, offset: 0 });
       expect(result.drivers.length).toBe(0);
       expect(result.total).toBe(0);
+
+      const includingDeleted = await managerCaller.drivers.list({
+        limit: 10,
+        offset: 0,
+        includeDeleted: true,
+      });
+      expect(includingDeleted.drivers.length).toBe(1);
+      expect(includingDeleted.total).toBe(1);
+      expect(includingDeleted.drivers[0].deletedAt).toBeTruthy();
     });
 
     it("rejects list by driver role", async () => {
@@ -512,8 +563,8 @@ describe("drivers router", () => {
     });
   });
 
-  describe("delete (soft delete)", () => {
-    it("allows manager to soft delete driver", async () => {
+  describe("delete (archive vs permanent)", () => {
+    it("allows manager to delete driver", async () => {
       const created = await managerCaller.drivers.create({
         name: "Driver 1",
         email: "driver1@test.com",
@@ -522,13 +573,14 @@ describe("drivers router", () => {
         document: "11111111111",
       });
 
-      await managerCaller.drivers.delete({ id: created.id });
+      const result = await managerCaller.drivers.delete({ id: created.id });
+      expect(result).toEqual({ success: true, result: "deleted" });
 
       const list = await managerCaller.drivers.list({ limit: 10, offset: 0 });
       expect(list.drivers.length).toBe(0);
     });
 
-    it("preserves driver data after soft delete", async () => {
+    it("permanently deletes a driver without routes, freeing the e-mail", async () => {
       const created = await managerCaller.drivers.create({
         name: "Driver 1",
         email: "driver1@test.com",
@@ -537,10 +589,117 @@ describe("drivers router", () => {
         document: "11111111111",
       });
 
+      const result = await managerCaller.drivers.delete({ id: created.id });
+      expect(result).toEqual({ success: true, result: "deleted" });
+
+      const recreated = await managerCaller.drivers.create({
+        name: "Novo Motorista",
+        email: "driver1@test.com",
+        password: "senha456",
+        phone: "11999999999",
+        document: "11111111111",
+      });
+      expect(recreated.id).not.toBe(created.id);
+
+      const list = await managerCaller.drivers.list({
+        limit: 10,
+        offset: 0,
+        includeDeleted: true,
+      });
+      expect(list.drivers.length).toBe(1);
+    });
+
+    it("archives a driver assigned to a route, blocking login and revoking sessions", async () => {
+      const created = await managerCaller.drivers.create({
+        name: "Driver Arquivado",
+        email: "arquivado@test.com",
+        password: "senha123",
+        phone: "11999999999",
+        document: "11111111111",
+      });
+
+      await auth.api.signInEmail({
+        body: { email: "arquivado@test.com", password: "senha123" },
+      });
+      const sessionsBefore = await db
+        .select()
+        .from(sessionTable)
+        .where(eq(sessionTable.userId, created.id));
+      expect(sessionsBefore.length).toBeGreaterThan(0);
+
+      await seedRouteReferencing(created.id);
+
+      const result = await managerCaller.drivers.delete({ id: created.id });
+      expect(result).toEqual({ success: true, result: "archived" });
+
+      const [archivedUser] = await db
+        .select()
+        .from(userTable)
+        .where(eq(userTable.id, created.id));
+      expect(archivedUser.deletedAt).toBeTruthy();
+      expect(archivedUser.banned).toBe(true);
+
+      const sessionsAfter = await db
+        .select()
+        .from(sessionTable)
+        .where(eq(sessionTable.userId, created.id));
+      expect(sessionsAfter.length).toBe(0);
+
+      await expect(
+        auth.api.signInEmail({
+          body: { email: "arquivado@test.com", password: "senha123" },
+        }),
+      ).rejects.toThrow(/arquivada/);
+    });
+
+    it("lets an archived driver sign in again after restore", async () => {
+      const created = await managerCaller.drivers.create({
+        name: "Driver Restaurado",
+        email: "restaurado@test.com",
+        password: "senha123",
+        phone: "11999999999",
+        document: "22222222222",
+      });
+
+      await seedRouteReferencing(created.id);
       await managerCaller.drivers.delete({ id: created.id });
 
-      // Should still be able to get by ID including deleted
-      // (This would require a different endpoint or admin access)
+      await adminCaller.drivers.restore({ id: created.id });
+
+      const { user } = await auth.api.signInEmail({
+        body: { email: "restaurado@test.com", password: "senha123" },
+      });
+      expect(user.email).toBe("restaurado@test.com");
+
+      const [restoredUser] = await db
+        .select()
+        .from(userTable)
+        .where(eq(userTable.id, created.id));
+      expect(restoredUser.deletedAt).toBeNull();
+      expect(restoredUser.banned).toBe(false);
+    });
+
+    it("rejects creating a user with the e-mail of an archived user", async () => {
+      const created = await managerCaller.drivers.create({
+        name: "Driver E-mail",
+        email: "email-arquivado@test.com",
+        password: "senha123",
+        phone: "11999999999",
+        document: "33333333333",
+      });
+
+      await seedRouteReferencing(created.id);
+      await managerCaller.drivers.delete({ id: created.id });
+
+      await expect(
+        managerCaller.drivers.create({
+          name: "Outro Motorista",
+          email: "email-arquivado@test.com",
+          password: "senha123",
+          phone: "11999999999",
+          document: "44444444444",
+        }),
+      ).rejects.toThrow(ConflictError);
     });
 
     it("rejects delete by driver role", async () => {
@@ -556,10 +715,28 @@ describe("drivers router", () => {
         driverCaller.drivers.delete({ id: created.id }),
       ).rejects.toThrow(ForbiddenError);
     });
+
+    it("rejects manager deleting a manager, allows admin", async () => {
+      const manager = await adminCaller.drivers.createManager({
+        name: "Manager Alvo",
+        email: "manager-alvo@test.com",
+        password: "senha123",
+        phone: "11999999999",
+        document: "66666666666",
+        role: "manager",
+      });
+
+      await expect(
+        managerCaller.drivers.delete({ id: manager.id }),
+      ).rejects.toThrow(ForbiddenError);
+
+      const result = await adminCaller.drivers.delete({ id: manager.id });
+      expect(result).toEqual({ success: true, result: "deleted" });
+    });
   });
 
-  describe("restore (admin only)", () => {
-    it("allows admin to restore soft-deleted driver", async () => {
+  describe("restore (manager for drivers, admin for everyone)", () => {
+    it("allows admin to restore archived driver", async () => {
       const created = await managerCaller.drivers.create({
         name: "Driver 1",
         email: "driver1@test.com",
@@ -568,6 +745,7 @@ describe("drivers router", () => {
         document: "11111111111",
       });
 
+      await seedRouteReferencing(created.id);
       await managerCaller.drivers.delete({ id: created.id });
 
       const restored = await adminCaller.drivers.restore({ id: created.id });
@@ -578,7 +756,7 @@ describe("drivers router", () => {
       expect(list.drivers.length).toBe(1);
     });
 
-    it("rejects restore by manager role", async () => {
+    it("allows manager to restore archived driver", async () => {
       const created = await managerCaller.drivers.create({
         name: "Driver 1",
         email: "driver1@test.com",
@@ -587,11 +765,45 @@ describe("drivers router", () => {
         document: "11111111111",
       });
 
+      await seedRouteReferencing(created.id);
       await managerCaller.drivers.delete({ id: created.id });
 
+      const restored = await managerCaller.drivers.restore({ id: created.id });
+      expect(restored.id).toBe(created.id);
+
+      const list = await managerCaller.drivers.list({ limit: 10, offset: 0 });
+      expect(list.drivers.length).toBe(1);
+    });
+
+    it("rejects manager restoring an archived manager", async () => {
+      const manager = await adminCaller.drivers.createManager({
+        name: "Manager Arquivado",
+        email: "manager-arquivado@test.com",
+        password: "senha123",
+        phone: "11999999999",
+        document: "55555555555",
+        role: "manager",
+      });
+
+      const [driver] = await db
+        .insert(userTable)
+        .values({
+          id: crypto.randomUUID(),
+          name: "Route Driver",
+          email: `route-driver-${crypto.randomUUID()}@test.com`,
+          emailVerified: true,
+          role: "driver",
+        })
+        .returning();
+      await seedRouteReferencing(driver.id, manager.id);
+      await adminCaller.drivers.delete({ id: manager.id });
+
       await expect(
-        managerCaller.drivers.restore({ id: created.id }),
+        managerCaller.drivers.restore({ id: manager.id }),
       ).rejects.toThrow(ForbiddenError);
+
+      const restored = await adminCaller.drivers.restore({ id: manager.id });
+      expect(restored.id).toBe(manager.id);
     });
 
     it("rejects restore by driver role", async () => {
@@ -603,6 +815,7 @@ describe("drivers router", () => {
         document: "11111111111",
       });
 
+      await seedRouteReferencing(created.id);
       await managerCaller.drivers.delete({ id: created.id });
 
       await expect(

@@ -99,11 +99,11 @@ Regras complementares implementadas no serviço de rotas:
 | RF10 | Listar usuários com paginação, filtro por perfil e busca por nome ou e-mail; gerente visualiza apenas motoristas e administrador visualiza todos os perfis | Alta |
 | RF11 | Consultar os dados de um motorista/gerente específico | Média |
 | RF12 | Atualizar nome, telefone e documento (CPF) do motorista, criptografando novamente o documento | Alta |
-| RF13 | Excluir (soft delete) lógicamente e restaurar usuários, sendo a restauração exclusiva do administrador | Média |
+| RF13 | Excluir permanentemente usuários sem roteiros vinculados ou arquivar (bloqueando o acesso) os que possuem histórico; restaurar arquivados — gerentes restauram motoristas, administradores restauram qualquer perfil | Média |
 | RF14 | Cadastrar veículo com placa, modelo, rendimento em km por litro e situação ativa/inativa | Alta |
 | RF15 | Listar veículos, restringindo o motorista à lista de veículos ativos | Alta |
 | RF16 | Atualizar veículo (placa, modelo, rendimento, situação), impedindo placa duplicada | Alta |
-| RF17 | Excluir veículo da frota (soft delete), retirando-o das listagens | Média |
+| RF17 | Excluir veículo permanentemente quando não há roteiros vinculados, ou arquivá-lo quando há histórico; veículos arquivados podem ser listados e restaurados | Média |
 | RF18 | Cadastrar ponto com nome e endereço, obtendo latitude/longitude por geocodificação automática | Alta |
 | RF19 | Cadastrar ponto com coordenadas informadas manualmente, marcando a origem como `manual` | Média |
 | RF20 | Consultar o detalhe de um ponto (nome, endereço, coordenadas e situação da geocodificação) | Média |
@@ -137,8 +137,10 @@ Regras complementares implementadas no serviço de rotas:
 | RF48 | Consultar a duração da jornada padrão configurada | Baixa |
 | RF49 | Consultar os parâmetros do sistema (preço do combustível e jornada padrão) | Alta |
 | RF50 | Atualizar os parâmetros do sistema (preço do combustível em R$/L e jornada padrão em minutos) sem alteração de código | Alta |
+| RF51 | Impedir o login de usuários arquivados e revogar suas sessões ativas no momento do arquivamento | Alta |
+| RF52 | Listar veículos e usuários arquivados com status "Arquivado" (ocultos por padrão), permitindo a restauração | Média |
 
-**Total: 50 requisitos funcionais (RF01–RF50).**
+**Total: 52 requisitos funcionais (RF01–RF52).**
 
 ### 2.1 Rastreabilidade requisito → implementação
 
@@ -219,3 +221,5 @@ Observações verificáveis no código, que delimitam o escopo realmente entregu
 - O aplicativo nativo com detecção automática de paradas por GPS está fora do escopo
   implementado; o cliente do motorista registra a chegada/saída manualmente (ADR 0001).
 - Não há integração com folha de pagamento/ERP, nem roteirização automática.
+- O arquivamento de usuário revoga suas sessões no banco, mas o cache de sessão em cookie
+  (5 minutos) pode manter um acesso já autenticado por até esse intervalo (ADR 0004).

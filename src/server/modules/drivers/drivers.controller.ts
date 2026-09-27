@@ -5,6 +5,7 @@ import { DriversService } from "./drivers.service";
 import type {
   CreateDriverInput,
   CreateManagerInput,
+  DeleteUserOutput,
   DriverOutput,
   ListDriversInput,
   UpdateDriverInput,
@@ -37,11 +38,11 @@ export class DriversController {
     return this.service.updateDriver(id, input);
   }
 
-  deleteDriver(id: string): Promise<void> {
-    return this.service.deleteDriver(id);
+  deleteDriver(id: string, isAdmin = false): Promise<DeleteUserOutput> {
+    return this.service.deleteDriver(id, isAdmin);
   }
 
-  restoreDriver(id: string): Promise<DriverOutput> {
-    return this.service.restoreDriver(id);
+  restoreDriver(id: string, isAdmin = false): Promise<DriverOutput> {
+    return this.service.restoreDriver(id, isAdmin);
   }
 }

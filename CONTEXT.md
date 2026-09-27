@@ -52,6 +52,10 @@ _Avoid_: config, setting
 Estimated expense for a route. Formula: `distance_km × fuel_price / vehicle.km_per_liter`, using the vehicle bound to the route. When no vehicle is bound, cost is undetermined until the driver picks one. Distance is road distance via OSRM routing over the stops' geocoded coordinates (address → coordinates via a geocoder such as Nominatim; coordinates → distance via OSRM). Any distance override is versioned.
 _Avoid_: trip cost, delivery cost
 
+**Archived** (Arquivado):
+The deletion state of a vehicle or user that has route history (`route`, `route_version`, or `stop_version.actor_id` references): the row stays with `deleted_at` set and the record cannot be edited, only restored. Records without route history are permanently deleted instead — archiving exists to preserve route history and audit. An archived user additionally gets `banned = true` and all sessions revoked, so they cannot sign in. Archived rows are hidden by default in listings and carry the "Arquivado" status badge.
+_Avoid_: deactivated, disabled, soft-deleted (legacy terms for this state)
+
 ### Architecture
 
 **SyncClient**:
@@ -74,3 +78,5 @@ _Avoid_: sync engine, offline manager
 - RN05: Each route belongs to one driver and one date
 - RN06: Stops have sequential order (1, 2, 3, …)
 - RN07: Route cost = distance × (fuel price / vehicle km per liter); distance from OSRM routing
+- RN08: Deleting a vehicle or user with route history archives it; without history it is permanently deleted
+- RN09: Archived users are banned at sign-in (sessions revoked on archive)

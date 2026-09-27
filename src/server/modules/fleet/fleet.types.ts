@@ -53,6 +53,16 @@ export type UpdateVehicleInput = z.infer<typeof updateVehicleInputSchema>;
 export const listVehiclesInputSchema = z
   .object({
     activeOnly: z.boolean().optional(),
+    includeDeleted: z.boolean().optional(),
   })
   .optional();
 export type ListVehiclesInput = z.infer<typeof listVehiclesInputSchema>;
+
+export const vehicleDeleteResultSchema = z.enum(["archived", "deleted"]);
+export type VehicleDeleteResult = z.infer<typeof vehicleDeleteResultSchema>;
+
+export const deleteVehicleOutputSchema = z.object({
+  success: z.literal(true),
+  result: vehicleDeleteResultSchema,
+});
+export type DeleteVehicleOutput = z.infer<typeof deleteVehicleOutputSchema>;

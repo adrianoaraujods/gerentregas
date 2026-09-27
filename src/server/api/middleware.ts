@@ -5,10 +5,17 @@ import { createMiddleware } from "./trpc";
 
 type UserRole = (typeof USER_ROLES)[number];
 
+function throwIfBanned(user: { banned?: boolean | null }) {
+  if (user.banned) {
+    throw new ForbiddenError("Esta conta foi arquivada.");
+  }
+}
+
 export const authMiddleware = createMiddleware(async ({ ctx, next }) => {
   if (!ctx.session) {
     throw new UnauthorizedError("Você deve estar autenticado.");
   }
+  throwIfBanned(ctx.session.user);
   return next({ ctx: { ...ctx, session: ctx.session } });
 });
 
@@ -17,6 +24,7 @@ function roleMiddleware(allowedRoles: readonly UserRole[]) {
     if (!ctx.session) {
       throw new UnauthorizedError("Você deve estar autenticado.");
     }
+    throwIfBanned(ctx.session.user);
     if (!allowedRoles.includes(ctx.session.user.role as UserRole)) {
       throw new ForbiddenError("Você não tem autorização.");
     }
