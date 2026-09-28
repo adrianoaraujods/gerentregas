@@ -18,7 +18,7 @@ export default async function AdminLayout({
   children: ReactNode;
 }) {
   const session = await getSession();
-  
+
   if (!session) {
     redirect("/entrar?callbackUrl=%2Fadmin");
   }

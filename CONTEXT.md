@@ -84,3 +84,9 @@ _Avoid_: sync engine, offline manager
 - RN07: Route cost = distance × (fuel price / vehicle km per liter); distance from OSRM routing
 - RN08: Deleting a vehicle or user with route history archives it; without history it is permanently deleted
 - RN09: Archived users are banned at sign-in (sessions revoked on archive)
+
+## 4. UI Guidelines
+
+- **Touch Targets**: Botões, inputs e selects utilizam tamanhos responsivos por padrão (ex.: `h-11 md:h-8`). Sempre use as variantes de tamanho padrão para formulários e controles principais.
+  - As variantes `sm`, `xs` e `icon-sm` (ex.: paginação de tabelas) são projetadas para ter áreas de toque de pelo menos 44px em telas menores e reduzir de tamanho a partir de `md:`.
+  - Não force dimensões fixas (como `h-8`) via className em elementos interativos, delegue para a prop `size`.
