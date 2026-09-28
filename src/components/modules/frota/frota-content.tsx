@@ -1,5 +1,6 @@
 "use client";
 
+import { ArchiveRestore, Pencil, Trash } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -7,6 +8,8 @@ import {
   createAppColumnHelper,
   DataTable,
   type ExtendedColumnFilter,
+  RowActions,
+  RowActionsItem,
   useAppTable,
 } from "@/components/data-table";
 import {
@@ -228,37 +231,31 @@ export function FrotaContent() {
       columnHelper.display({
         id: "acoes",
         header: () => <div className="text-right">Ações</div>,
-        cell: ({ row }) => (
-          <div className="flex justify-end gap-2">
-            {row.original.deletedAt ? (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => restoreMutation.mutate({ id: row.original.id })}
+        cell: ({ row }) =>
+          row.original.deletedAt ? (
+            <RowActions>
+              <RowActionsItem
+                icon={ArchiveRestore}
+                label="Restaurar"
                 disabled={restoreMutation.isPending}
-              >
-                Restaurar
-              </Button>
-            ) : (
-              <>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => openEditModal(row.original)}
-                >
-                  Editar
-                </Button>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => setVehicleToDelete(row.original)}
-                >
-                  Excluir
-                </Button>
-              </>
-            )}
-          </div>
-        ),
+                onClick={() => restoreMutation.mutate({ id: row.original.id })}
+              />
+            </RowActions>
+          ) : (
+            <RowActions>
+              <RowActionsItem
+                icon={Pencil}
+                label="Editar"
+                onClick={() => openEditModal(row.original)}
+              />
+              <RowActionsItem
+                icon={Trash}
+                label="Excluir"
+                variant="destructive"
+                onClick={() => setVehicleToDelete(row.original)}
+              />
+            </RowActions>
+          ),
         enableSorting: false,
         enableGrouping: false,
         enableHiding: false,

@@ -8,6 +8,7 @@ export * from "./filter-list";
 export * from "./filter-logic";
 export * from "./headers";
 export * from "./pagination";
+export * from "./row-actions";
 export * from "./sort-list";
 export { cellContext, headerContext, tableContext } from "./table-context";
 export * from "./toolbar";

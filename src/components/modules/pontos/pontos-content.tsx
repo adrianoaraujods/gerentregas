@@ -13,6 +13,8 @@ import { toast } from "sonner";
 import {
   createAppColumnHelper,
   DataTable,
+  RowActions,
+  RowActionsItem,
   useAppTable,
 } from "@/components/data-table";
 import {
@@ -159,24 +161,19 @@ export function PontosContent() {
         id: "acoes",
         header: () => <div className="text-right">Ações</div>,
         cell: ({ row }) => (
-          <div className="flex justify-end gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
+          <RowActions>
+            <RowActionsItem
+              icon={Pencil}
+              label="Editar"
               onClick={() => handleEdit(row.original)}
-              title="Editar"
-            >
-              <Pencil className="h-4 w-4 text-muted-foreground" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
+            />
+            <RowActionsItem
+              icon={Trash}
+              label="Excluir"
+              variant="destructive"
               onClick={() => setPointToDelete(row.original)}
-              title="Excluir"
-            >
-              <Trash className="h-4 w-4 text-destructive" />
-            </Button>
-          </div>
+            />
+          </RowActions>
         ),
         enableSorting: false,
         enableGrouping: false,

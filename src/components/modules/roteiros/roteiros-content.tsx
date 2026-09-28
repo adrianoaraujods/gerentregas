@@ -7,6 +7,8 @@ import { toast } from "sonner";
 import {
   createAppColumnHelper,
   DataTable,
+  RowActions,
+  RowActionsItem,
   useAppTable,
 } from "@/components/data-table";
 import {
@@ -157,40 +159,31 @@ export function RoteirosContent() {
         id: "acoes",
         header: () => <div className="text-right">Ações</div>,
         cell: ({ row }) => (
-          <div className="flex justify-end gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
+          <RowActions>
+            <RowActionsItem
+              icon={History}
+              label="Histórico de versões"
               onClick={() => {
                 setRouteHistoryId(row.original.id);
                 setIsHistoryDialogOpen(true);
               }}
-              title="Histórico de versões"
-            >
-              <History className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
+            />
+            <RowActionsItem
+              icon={MapIcon}
+              label="Editar roteiro"
               onClick={() => {
                 setRouteToEditId(row.original.id);
                 setIsDialogOpen(true);
               }}
-              title="Editar roteiro"
-            >
-              <MapIcon className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="text-destructive hover:bg-destructive hover:text-destructive-foreground"
-              onClick={() => setRouteToDelete(row.original)}
+            />
+            <RowActionsItem
+              icon={Trash}
+              label="Excluir roteiro"
+              variant="destructive"
               disabled={deleteMutation.isPending}
-              title="Excluir roteiro"
-            >
-              <Trash className="h-4 w-4" />
-            </Button>
-          </div>
+              onClick={() => setRouteToDelete(row.original)}
+            />
+          </RowActions>
         ),
         enableSorting: false,
         enableGrouping: false,
