@@ -276,6 +276,37 @@ describe("PointsService", () => {
       expect(result.geocodeStatus).toBe("success");
     });
 
+    it("re-geocodes when address changes and provided coordinates match existing ones", async () => {
+      mockGeocoder.geocode
+        .mockResolvedValueOnce({
+          latitude: -23.5505,
+          longitude: -46.6333,
+          displayName: "São Paulo, SP, Brasil",
+        } as GeocodeResult)
+        .mockResolvedValueOnce({
+          latitude: -22.9068,
+          longitude: -43.1729,
+          displayName: "Rio de Janeiro, RJ, Brasil",
+        } as GeocodeResult);
+
+      const created = await service.createPoint({
+        name: "Ponto",
+        address: "Av. Paulista, 1000, São Paulo, SP",
+      });
+
+      const result = await service.updatePoint(created.id, {
+        address: "Av. Atlântica, 2000, Rio de Janeiro, RJ",
+        latitude: -23.5505,
+        longitude: -46.6333,
+      });
+
+      expect(result.address).toBe("Av. Atlântica, 2000, Rio de Janeiro, RJ");
+      expect(result.latitude).toBe(-22.9068);
+      expect(result.longitude).toBe(-43.1729);
+      expect(result.geocodeStatus).toBe("success");
+      expect(mockGeocoder.geocode).toHaveBeenCalledTimes(2);
+    });
+
     it("uses manual coordinates when provided during address update", async () => {
       mockGeocoder.geocode.mockResolvedValueOnce({
         latitude: -23.5505,
@@ -343,6 +374,65 @@ describe("PointsService", () => {
       expect(result.latitude).toBe(-15.7942);
       expect(result.longitude).toBe(-47.8825);
       expect(result.geocodeStatus).toBe("manual");
+    });
+
+    it("keeps current geocode status when updated coordinates match existing ones", async () => {
+      mockGeocoder.geocode.mockResolvedValueOnce({
+        latitude: -23.5505,
+        longitude: -46.6333,
+        displayName: "São Paulo, SP, Brasil",
+      } as GeocodeResult);
+
+      const created = await service.createPoint({
+        name: "Ponto",
+        address: "Av. Paulista, 1000, São Paulo, SP",
+      });
+
+      const result = await service.updatePoint(created.id, {
+        name: "Ponto Renomeado",
+        latitude: -23.5505,
+        longitude: -46.6333,
+      });
+
+      expect(result.name).toBe("Ponto Renomeado");
+      expect(result.latitude).toBe(-23.5505);
+      expect(result.longitude).toBe(-46.6333);
+      expect(result.geocodeStatus).toBe("success");
+      expect(mockGeocoder.geocode).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps manual geocode status when updated coordinates match existing ones", async () => {
+      const created = await service.createPoint({
+        name: "Ponto Manual",
+        address: "Endereço sem geocoding",
+        latitude: -22.9068,
+        longitude: -43.1729,
+      });
+
+      const result = await service.updatePoint(created.id, {
+        name: "Ponto Renomeado",
+        latitude: -22.9068,
+        longitude: -43.1729,
+      });
+
+      expect(result.geocodeStatus).toBe("manual");
+      expect(mockGeocoder.geocode).not.toHaveBeenCalled();
+    });
+
+    it("keeps failed geocode status when update sends no coordinates", async () => {
+      mockGeocoder.geocode.mockResolvedValueOnce(null);
+
+      const created = await service.createPoint({
+        name: "Ponto Falhou",
+        address: "Endereço inexistente xyz123",
+      });
+
+      const result = await service.updatePoint(created.id, {
+        name: "Ponto Renomeado",
+      });
+
+      expect(result.geocodeStatus).toBe("failed");
+      expect(mockGeocoder.geocode).toHaveBeenCalledTimes(1);
     });
 
     it("throws NotFoundError for non-existent point", async () => {

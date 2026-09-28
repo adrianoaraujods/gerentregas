@@ -77,14 +77,18 @@ export class PointsService {
     let longitude: number | null | undefined = validated.longitude;
     let geocodeStatus: "success" | "failed" | "manual" | undefined;
 
+    const coordinatesProvided =
+      validated.latitude !== undefined && validated.longitude !== undefined;
+    const coordinatesChanged =
+      coordinatesProvided &&
+      (validated.latitude !== existing.latitude ||
+        validated.longitude !== existing.longitude);
+
     if (
       validated.address !== undefined &&
       validated.address !== existing.address
     ) {
-      if (
-        validated.latitude !== undefined &&
-        validated.longitude !== undefined
-      ) {
+      if (coordinatesChanged) {
         geocodeStatus = "manual";
       } else {
         const geocodeResult = await this.geocodeWithFallback(validated.address);
@@ -98,10 +102,7 @@ export class PointsService {
           geocodeStatus = "failed";
         }
       }
-    } else if (
-      validated.latitude !== undefined &&
-      validated.longitude !== undefined
-    ) {
+    } else if (coordinatesChanged) {
       geocodeStatus = "manual";
     }
 
