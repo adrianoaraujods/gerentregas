@@ -41,8 +41,8 @@ export function MapComponent() {
       >
         {/* Standard OSM with CSS inversion/filters for theme support */}
         <TileLayer
-          attribution='&copy; <a href="https://carto.com/attributions">CARTO</a>'
-          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+          attribution='&copy; <a href="https://www.google.com/maps">Google Maps</a>'
+          url="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}"
           className={tileClass}
         />
         <ZoomControl position="bottomright" />
