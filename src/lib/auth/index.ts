@@ -21,6 +21,9 @@ const baseURL = process.env.BETTER_AUTH_URL ?? {
 
 export const auth = betterAuth({
   baseURL,
+  trustedOrigins: process.env.CODESPACE_NAME
+    ? [`https://${process.env.CODESPACE_NAME}-3000.app.github.dev`]
+    : [],
   database: drizzleAdapter(db, { provider: "pg", schema }),
   emailAndPassword: {
     enabled: true,
