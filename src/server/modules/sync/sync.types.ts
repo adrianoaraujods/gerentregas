@@ -32,8 +32,8 @@ export const syncRejectionReasonSchema = z.enum([
 export type SyncRejectionReason = z.infer<typeof syncRejectionReasonSchema>;
 
 export const syncRejectedItemSchema = z.object({
-  id: z.string().uuid(),
-  stopId: z.string().uuid(),
+  id: z.string(),
+  stopId: z.string(),
   reason: syncRejectionReasonSchema,
   message: z.string(),
 });

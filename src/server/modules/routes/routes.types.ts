@@ -169,7 +169,7 @@ export type ConcludeStopInput = z.infer<typeof concludeStopInputSchema>;
 export const listRoutesInputSchema = z.object({
   limit: z.number().int().positive().max(1000).default(20),
   offset: z.number().int().nonnegative().default(0),
-  driverId: z.string().uuid().optional(),
+  driverId: z.string().optional(),
   status: routeStatusSchema.optional(),
   dateFrom: z.iso
     .datetime({ local: true })

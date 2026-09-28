@@ -45,7 +45,7 @@ export const routesRouter = createRouter({
     ),
 
   get: managerProcedure
-    .input(z.object({ id: z.string().uuid() }))
+    .input(z.object({ id: z.string() }))
     .query(({ ctx: { db }, input }) =>
       createController(db)
         .getRoute(input.id)
@@ -68,7 +68,7 @@ export const routesRouter = createRouter({
     }),
 
   update: managerProcedure
-    .input(z.object({ id: z.string().uuid() }).merge(updateRouteInputSchema))
+    .input(z.object({ id: z.string() }).merge(updateRouteInputSchema))
     .mutation(({ ctx: { db, session }, input }) => {
       const { id, ...data } = input;
       return createController(db)
@@ -88,8 +88,8 @@ export const routesRouter = createRouter({
     .input(
       z
         .object({
-          routeId: z.string().uuid(),
-          stopId: z.string().uuid(),
+          routeId: z.string(),
+          stopId: z.string(),
         })
         .merge(updateStopInputSchema),
     )
@@ -101,7 +101,7 @@ export const routesRouter = createRouter({
     }),
 
   concludeStop: managerProcedure
-    .input(z.object({ routeId: z.string().uuid(), stopId: z.string().uuid() }))
+    .input(z.object({ routeId: z.string(), stopId: z.string() }))
     .mutation(({ ctx: { db }, input }) =>
       createController(db)
         .concludeStop(input.routeId, input.stopId)
@@ -109,7 +109,7 @@ export const routesRouter = createRouter({
     ),
 
   deleteStop: managerProcedure
-    .input(z.object({ routeId: z.string().uuid(), stopId: z.string().uuid() }))
+    .input(z.object({ routeId: z.string(), stopId: z.string() }))
     .mutation(({ ctx: { db, session }, input }) =>
       createController(db)
         .deleteStop(input.routeId, input.stopId, session.user.id)
@@ -117,13 +117,13 @@ export const routesRouter = createRouter({
     ),
 
   delete: managerProcedure
-    .input(z.object({ id: z.string().uuid() }))
+    .input(z.object({ id: z.string() }))
     .mutation(({ ctx: { db }, input }) =>
       createController(db).softDeleteRoute(input.id),
     ),
 
   restore: adminProcedure
-    .input(z.object({ id: z.string().uuid() }))
+    .input(z.object({ id: z.string() }))
     .mutation(({ ctx: { db }, input }) =>
       createController(db)
         .restoreRoute(input.id)
@@ -131,7 +131,7 @@ export const routesRouter = createRouter({
     ),
 
   history: managerProcedure
-    .input(z.object({ id: z.string().uuid() }))
+    .input(z.object({ id: z.string() }))
     .query(({ ctx: { db }, input }) =>
       createController(db)
         .getRouteHistory(input.id)
@@ -155,7 +155,7 @@ export const routesRouter = createRouter({
 
   startShift: driverProcedure
     .input(
-      z.object({ routeId: z.string().uuid() }).merge(startShiftInputSchema),
+      z.object({ routeId: z.string() }).merge(startShiftInputSchema),
     )
     .mutation(({ ctx: { db, session }, input }) => {
       const { routeId, ...data } = input;
@@ -180,8 +180,8 @@ export const routesRouter = createRouter({
     .input(
       z
         .object({
-          routeId: z.string().uuid(),
-          stopId: z.string().uuid(),
+          routeId: z.string(),
+          stopId: z.string(),
         })
         .merge(correctTimestampsInputSchema),
     )
