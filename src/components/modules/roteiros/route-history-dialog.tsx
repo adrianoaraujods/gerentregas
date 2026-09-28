@@ -4,12 +4,12 @@ import { format } from "date-fns";
 import { History, User } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api/client";
 
@@ -30,18 +30,18 @@ export function RouteHistoryDialog({
   );
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent size="lg">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <History className="h-5 w-5" />
-            Histórico de Versões do Roteiro
-          </DialogTitle>
-          <DialogDescription>
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="w-[90vw] sm:max-w-xl md:max-w-2xl bg-zinc-950/90 backdrop-blur-xl border-l-white/10 flex flex-col gap-0 p-6">
+        <SheetHeader className="pb-4 border-b border-white/10 shrink-0">
+          <SheetTitle className="flex items-center gap-2 text-xl">
+            <History className="h-5 w-5 text-primary" />
+            Histórico de Versões
+          </SheetTitle>
+          <SheetDescription className="mt-1.5">
             Acompanhe a linha do tempo de alterações estruturais e correções
             deste roteiro.
-          </DialogDescription>
-        </DialogHeader>
+          </SheetDescription>
+        </SheetHeader>
 
         <div className="space-y-6 mt-4 min-h-0 overflow-y-auto">
           {isLoading ? (
@@ -160,7 +160,7 @@ export function RouteHistoryDialog({
             </div>
           )}
         </div>
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 }

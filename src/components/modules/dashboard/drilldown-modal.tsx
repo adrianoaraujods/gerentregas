@@ -2,12 +2,12 @@
 import { DataTable, useAppTable } from "@/components/data-table";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { buildDrilldownColumns, type DrilldownStop } from "./drilldown-columns";
 
 const modalColumns = buildDrilldownColumns(false);
@@ -38,26 +38,26 @@ export function DrilldownModal({
   });
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent size="xl">
-        <DialogHeader className="pr-8">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <DialogTitle>{title}</DialogTitle>
-              <DialogDescription>
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="w-[90vw] sm:max-w-xl md:max-w-2xl bg-zinc-950/90 backdrop-blur-xl border-l-white/10 flex flex-col gap-0 p-6">
+        <SheetHeader className="pb-4 border-b border-white/10 shrink-0">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="text-left">
+              <SheetTitle className="text-xl">{title}</SheetTitle>
+              <SheetDescription className="mt-1.5">
                 {stops.length} parada(s) • {totalDwellMinutes} min total •{" "}
                 {workdayPercentage.toFixed(1)}% da jornada
-              </DialogDescription>
+              </SheetDescription>
             </div>
             {onExportCSV && (
-              <Button variant="outline" size="sm" onClick={onExportCSV}>
+              <Button variant="outline" size="sm" onClick={onExportCSV} className="w-full sm:w-auto shrink-0 bg-white/5 border-white/10 hover:bg-white/10">
                 Exportar CSV
               </Button>
             )}
           </div>
-        </DialogHeader>
+        </SheetHeader>
 
-        <div className="mt-4 min-h-0 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto min-h-0 py-4 pb-12 -mx-6 px-6">
           {stops.length > 0 && (
             <DataTable
               table={table}
@@ -66,7 +66,7 @@ export function DrilldownModal({
             />
           )}
         </div>
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 }
