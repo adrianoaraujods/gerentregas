@@ -3,6 +3,9 @@
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import * as React from "react";
+import { keepPreviousData } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api/client";
@@ -87,6 +90,12 @@ export function DashboardContent() {
 
   const utils = api.useUtils();
 
+  const isPeriodValid = () => {
+    if (periodType === "day" && !date) return false;
+    if (periodType === "custom" && (!dateRange.from || !dateRange.to)) return false;
+    return true;
+  };
+
   const buildInput = (): GetAggregationInput => {
     const input: GetAggregationInput = { periodType };
     if (periodType === "day" && date) {
@@ -101,8 +110,16 @@ export function DashboardContent() {
     return input;
   };
 
-  const { data: aggregationRaw, isLoading: loadingAggregation } =
-    api.dashboard.getAggregation.useQuery(buildInput());
+  const { 
+    data: aggregationRaw, 
+    isLoading: loadingAggregation,
+    isFetching,
+    isError,
+    refetch 
+  } = api.dashboard.getAggregation.useQuery(buildInput(), {
+    enabled: isPeriodValid(),
+    placeholderData: keepPreviousData,
+  });
   const aggregation = aggregationRaw as DashboardData | undefined;
 
   const { data: workdayData } =
@@ -126,9 +143,16 @@ export function DashboardContent() {
       drilldownInput = { periodType: "day", date: date.toISOString() };
     }
 
-    try {
-      const data = await utils.dashboard.getDrilldown.fetch(drilldownInput);
+    const promise = utils.dashboard.getDrilldown.fetch(drilldownInput);
+    
+    toast.promise(promise, {
+      loading: "Buscando detalhes do dia...",
+      success: "Detalhes carregados com sucesso.",
+      error: "Erro ao buscar detalhes.",
+    });
 
+    try {
+      const data = await promise;
       setDrilldownStops(data.stops);
       setDrilldownTotal(data.totalDwellMinutes);
       setDrilldownWorkdayPct(data.workdayPercentage);
@@ -149,51 +173,19 @@ export function DashboardContent() {
     return utils.dashboard.exportCSV.fetch(buildInput());
   };
 
-  if (loadingAggregation) {
-    return (
-      <div className="space-y-4">
-        <Card>
-          <CardContent className="pt-6">
-            <Skeleton className="h-12 w-1/3" />
-            <div className="mt-4 grid gap-4 md:grid-cols-3">
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <Skeleton className="h-96 w-full" />
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  if (!aggregation) {
-    return (
-      <Card>
-        <CardContent className="py-12 text-center text-muted-foreground">
-          Nenhum dado disponível para o período selecionado.
-        </CardContent>
-      </Card>
-    );
-  }
-
   const renderChart = () => {
     switch (periodType) {
       case "day":
         return (
           <DayTimelineChart
-            stops={aggregation.stops || []}
+            stops={aggregation?.stops || []}
             onStopClick={(stop) => handleDrilldown(stop.stopId)}
           />
         );
       case "month":
         return (
           <MonthBarChart
-            data={aggregation.days || []}
+            data={aggregation?.days || []}
             title={`Mês ${month.month}/${month.year}`}
             onBarClick={(day) => handleDrilldown(day.date)}
             workdayMinutes={workdayMinutes}
@@ -202,9 +194,9 @@ export function DashboardContent() {
       case "custom":
         return (
           <CustomBarChart
-            data={aggregation.days || []}
+            data={aggregation?.days || []}
             title={
-              aggregation.dateFrom && aggregation.dateTo
+              aggregation?.dateFrom && aggregation?.dateTo
                 ? `${format(new Date(aggregation.dateFrom), "dd/MM/yyyy", { locale: ptBR })} a ${format(new Date(aggregation.dateTo), "dd/MM/yyyy", { locale: ptBR })}`
                 : "Período personalizado"
             }
@@ -213,6 +205,111 @@ export function DashboardContent() {
           />
         );
     }
+  };
+
+  const renderDataRegion = () => {
+    if (!isPeriodValid()) {
+      return (
+        <Card>
+          <CardContent className="py-12 text-center text-muted-foreground">
+            Selecione o início e o fim do período para visualizar os dados.
+          </CardContent>
+        </Card>
+      );
+    }
+
+    if (isError) {
+      return (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground">
+            <p className="mb-4">Ocorreu um erro ao carregar os dados.</p>
+            <Button variant="outline" onClick={() => refetch()}>Tentar novamente</Button>
+          </CardContent>
+        </Card>
+      );
+    }
+
+    if (loadingAggregation) {
+      return (
+        <div className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-3">
+            <Card><CardContent className="pt-6"><Skeleton className="h-16 w-full" /></CardContent></Card>
+            <Card><CardContent className="pt-6"><Skeleton className="h-16 w-full" /></CardContent></Card>
+            <Card><CardContent className="pt-6"><Skeleton className="h-16 w-full" /></CardContent></Card>
+          </div>
+          <Card>
+            <CardContent className="pt-6">
+              <Skeleton className="h-96 w-full" />
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
+
+    if (!aggregation || (aggregation.stops?.length === 0 && aggregation.days?.length === 0)) {
+      return (
+        <Card>
+          <CardContent className="py-12 text-center text-muted-foreground">
+            Nenhum dado disponível para o período selecionado.
+          </CardContent>
+        </Card>
+      );
+    }
+
+    return (
+      <div className={isFetching ? "opacity-60 transition-opacity" : "transition-opacity"}>
+        <div className="grid gap-4 md:grid-cols-3 mb-6">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Tempo Total Parado</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold tabular-nums">
+                {(aggregation.totalDwellMinutes / 60).toFixed(1)}h
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {aggregation.totalDwellMinutes} minutos
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">% da Jornada Padrão</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold tabular-nums">
+                {aggregation.workdayPercentage.toFixed(1)}%
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Jornada padrão: {workdayMinutes / 60}h
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">
+                {periodType === "day"
+                  ? "Paradas com Tempo Parado"
+                  : periodType === "month"
+                    ? "Dias com Dados"
+                    : "Dias no Período"}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold tabular-nums">
+                {periodType === "day"
+                  ? aggregation.stops?.filter((s) => s.dwellMinutes > 0).length || 0
+                  : aggregation.days?.length || 0}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card>
+          <CardContent className="pt-0">{renderChart()}</CardContent>
+        </Card>
+      </div>
+    );
   };
 
   return (
@@ -226,7 +323,7 @@ export function DashboardContent() {
         </div>
         <CsvExportButton
           onExport={handleCsvExport}
-          disabled={loadingAggregation}
+          disabled={!isPeriodValid() || loadingAggregation || isError || !aggregation}
         />
       </div>
 
@@ -245,62 +342,7 @@ export function DashboardContent() {
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">
-              Tempo Total Parado
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold tabular-nums">
-              {(aggregation.totalDwellMinutes / 60).toFixed(1)}h
-            </div>
-            <p className="text-sm text-muted-foreground">
-              {aggregation.totalDwellMinutes} minutos
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">
-              % da Jornada Padrão
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold tabular-nums">
-              {aggregation.workdayPercentage.toFixed(1)}%
-            </div>
-            <p className="text-sm text-muted-foreground">
-              Jornada padrão: {workdayMinutes / 60}h
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">
-              {periodType === "day"
-                ? "Paradas com Tempo Parado"
-                : periodType === "month"
-                  ? "Dias com Dados"
-                  : "Dias no Período"}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold tabular-nums">
-              {periodType === "day"
-                ? aggregation.stops?.filter(
-                    (s: DashboardStop) => s.dwellMinutes > 0,
-                  ).length || 0
-                : aggregation.days?.length || 0}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card>
-        <CardContent className="pt-0">{renderChart()}</CardContent>
-      </Card>
+      {renderDataRegion()}
 
       <DrilldownModal
         open={drilldownOpen}
