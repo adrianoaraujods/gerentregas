@@ -1,8 +1,9 @@
-import { notFound } from "next/navigation";
+import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
 import AdminSidebar from "@/components/layout/admin-sidebar";
 import { GridPattern } from "@/components/layout/background-patterns";
+import { RestrictedAccess } from "@/components/modules/auth/restricted-access";
 import {
   SidebarInset,
   SidebarProvider,
@@ -17,11 +18,14 @@ export default async function AdminLayout({
   children: ReactNode;
 }) {
   const session = await getSession();
-  if (
-    !session ||
-    (session.user.role !== "manager" && session.user.role !== "admin")
-  )
-    notFound();
+  
+  if (!session) {
+    redirect("/entrar?callbackUrl=%2Fadmin");
+  }
+
+  if (session.user.role !== "manager" && session.user.role !== "admin") {
+    return <RestrictedAccess role={session.user.role} />;
+  }
 
   return (
     <SidebarProvider className="min-h-svh" defaultOpen>

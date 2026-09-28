@@ -4,7 +4,7 @@ import { EyeIcon, EyeOffIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { revalidateLogic } from "@tanstack/react-form";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { useAppForm } from "@/components/hooks/use-app-form";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,7 @@ import { loginSchema } from "@/server/modules/auth/auth.types";
 
 export function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [showPassword, setShowPassword] = useState(false);
 
   const form = useAppForm({
@@ -44,7 +45,12 @@ export function LoginForm() {
         return;
       }
 
-      router.push("/");
+      const callbackUrl = searchParams.get("callbackUrl");
+      if (callbackUrl && callbackUrl.startsWith("/") && !callbackUrl.startsWith("//")) {
+        router.push(callbackUrl);
+      } else {
+        router.push("/");
+      }
     },
   });
 
