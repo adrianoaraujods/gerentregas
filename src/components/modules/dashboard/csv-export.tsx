@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import { DownloadIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { toast } from "sonner";
@@ -16,7 +17,11 @@ export function CsvExportButton({
   disabled = false,
   className,
 }: CsvExportButtonProps) {
+  const [isPending, setIsPending] = React.useState(false);
+
   const handleExport = async () => {
+    if (isPending) return;
+    setIsPending(true);
     try {
       const { csv, filename } = await onExport();
       const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -38,6 +43,8 @@ export function CsvExportButton({
       toast.error("Erro na exportação", {
         description: "Não foi possível gerar o arquivo CSV.",
       });
+    } finally {
+      setIsPending(false);
     }
   };
 
@@ -46,11 +53,15 @@ export function CsvExportButton({
       variant="outline"
       size="sm"
       onClick={handleExport}
-      disabled={disabled}
+      disabled={disabled || isPending}
       className={className}
     >
-      <HugeiconsIcon icon={DownloadIcon} className="mr-2 h-4 w-4" />
-      Exportar CSV
+      {isPending ? (
+        <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+      ) : (
+        <HugeiconsIcon icon={DownloadIcon} className="mr-2 h-4 w-4" />
+      )}
+      {isPending ? "Exportando..." : "Exportar CSV"}
     </Button>
   );
 }

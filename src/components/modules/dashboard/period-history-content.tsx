@@ -1,7 +1,9 @@
 "use client";
 
 import * as React from "react";
+import { keepPreviousData } from "@tanstack/react-query";
 import { DataTable, useAppTable } from "@/components/data-table";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api/client";
@@ -33,6 +35,12 @@ export function PeriodHistoryContent({
     to: undefined as Date | undefined,
   });
 
+  const isPeriodValid = () => {
+    if (periodType === "day" && !date) return false;
+    if (periodType === "custom" && (!dateRange.from || !dateRange.to)) return false;
+    return true;
+  };
+
   const buildQueryParams = (): GetAggregationInput => {
     const params: GetAggregationInput = { periodType };
     if (periodType === "day" && date) {
@@ -49,8 +57,16 @@ export function PeriodHistoryContent({
 
   const utils = api.useUtils();
 
-  const { data: drilldown, isLoading: loadingDrilldown } =
-    api.dashboard.getDrilldown.useQuery(buildQueryParams());
+  const { 
+    data: drilldown, 
+    isLoading: loadingDrilldown,
+    isFetching,
+    isError,
+    refetch 
+  } = api.dashboard.getDrilldown.useQuery(buildQueryParams(), {
+    enabled: isPeriodValid(),
+    placeholderData: keepPreviousData,
+  });
 
   const handleCsvExport = async () => {
     return utils.dashboard.exportCSV.fetch(buildQueryParams());
@@ -65,104 +81,115 @@ export function PeriodHistoryContent({
     initialState: { pagination: { pageIndex: 0, pageSize: 20 } },
   });
 
-  if (loadingDrilldown) {
-    return (
-      <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">
-              Histórico de Período
-            </h1>
-            <p className="text-muted-foreground">
-              Lista detalhada de paradas com tempos de permanência
-            </p>
-          </div>
-          <CsvExportButton onExport={handleCsvExport} disabled={true} />
-        </div>
-
+  const renderDataRegion = () => {
+    if (!isPeriodValid()) {
+      return (
         <Card>
-          <CardContent className="pt-6">
-            <PeriodSelector
-              periodType={periodType}
-              onPeriodTypeChange={setPeriodType}
-              date={date}
-              onDateChange={setDate}
-              month={month}
-              onMonthChange={setMonth}
-              dateRange={dateRange}
-              onDateRangeChange={setDateRange}
-            />
+          <CardContent className="py-12 text-center text-muted-foreground">
+            Selecione o início e o fim do período para visualizar os dados.
           </CardContent>
         </Card>
+      );
+    }
 
+    if (isError) {
+      return (
         <Card>
-          <CardContent className="pt-0">
+          <CardContent className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground">
+            <p className="mb-4">Ocorreu um erro ao carregar os dados.</p>
+            <Button variant="outline" onClick={() => refetch()}>Tentar novamente</Button>
+          </CardContent>
+        </Card>
+      );
+    }
+
+    if (loadingDrilldown) {
+      return (
+        <Card>
+          <CardContent className="pt-6">
             <div className="space-y-3">
               {Array.from({ length: 8 }).map((_, i) => (
-                // biome-ignore lint/suspicious/noArrayIndexKey: Skeletons are static
                 <Skeleton key={i} className="h-8 w-full" />
               ))}
             </div>
           </CardContent>
         </Card>
-      </div>
-    );
-  }
+      );
+    }
 
-  if (!drilldown) {
-    return (
-      <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">
-              Histórico de Período
-            </h1>
-            <p className="text-muted-foreground">
-              Lista detalhada de paradas com tempos de permanência
-            </p>
-          </div>
-          <CsvExportButton onExport={handleCsvExport} disabled={true} />
-        </div>
-
-        <Card>
-          <CardContent className="pt-6">
-            <PeriodSelector
-              periodType={periodType}
-              onPeriodTypeChange={setPeriodType}
-              date={date}
-              onDateChange={setDate}
-              month={month}
-              onMonthChange={setMonth}
-              dateRange={dateRange}
-              onDateRangeChange={setDateRange}
-            />
-          </CardContent>
-        </Card>
-
+    if (!drilldown || stops.length === 0) {
+      return (
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
             Nenhum dado disponível para o período selecionado.
           </CardContent>
         </Card>
+      );
+    }
+
+    return (
+      <div className={isFetching ? "opacity-60 transition-opacity" : "transition-opacity"}>
+        <div className="grid gap-4 md:grid-cols-4 mb-6">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Total de Paradas</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold tabular-nums">{stops.length}</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Tempo Total Parado</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold tabular-nums">
+                {(drilldown.totalDwellMinutes / 60).toFixed(1)}h
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {drilldown.totalDwellMinutes} minutos
+              </p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">% da Jornada Padrão</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold tabular-nums">
+                {drilldown.workdayPercentage.toFixed(1)}%
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Paradas c/ Tempo Parado</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold tabular-nums">
+                {stops.filter((s) => s.dwellMinutes > 0).length}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card>
+          <CardContent className="pt-0">
+            <DataTable table={table} toolbarProps={{ searchPlaceholder: "Pesquisar paradas..." }} />
+          </CardContent>
+        </Card>
       </div>
     );
-  }
+  };
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            Histórico de Período
-          </h1>
-          <p className="text-muted-foreground">
-            Lista detalhada de paradas com tempos de permanência
-          </p>
+          <h1 className="text-2xl font-bold tracking-tight">Histórico de Período</h1>
+          <p className="text-muted-foreground">Lista detalhada de paradas com tempos de permanência</p>
         </div>
-        <CsvExportButton
-          onExport={handleCsvExport}
-          disabled={loadingDrilldown}
-        />
+        <CsvExportButton onExport={handleCsvExport} disabled={!isPeriodValid() || loadingDrilldown || isError || !drilldown} />
       </div>
 
       <Card>
@@ -180,68 +207,7 @@ export function PeriodHistoryContent({
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">
-              Total de Paradas
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold tabular-nums">
-              {stops.length}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">
-              Tempo Total Parado
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold tabular-nums">
-              {(drilldown.totalDwellMinutes / 60).toFixed(1)}h
-            </div>
-            <p className="text-sm text-muted-foreground">
-              {drilldown.totalDwellMinutes} minutos
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">
-              % da Jornada Padrão
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold tabular-nums">
-              {drilldown.workdayPercentage.toFixed(1)}%
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">
-              Paradas c/ Tempo Parado
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold tabular-nums">
-              {stops.filter((s) => s.dwellMinutes > 0).length}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card>
-        <CardContent className="pt-0">
-          <DataTable
-            table={table}
-            toolbarProps={{ searchPlaceholder: "Pesquisar paradas..." }}
-          />
-        </CardContent>
-      </Card>
+      {renderDataRegion()}
     </div>
   );
 }
