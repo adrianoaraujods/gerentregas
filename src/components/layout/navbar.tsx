@@ -103,7 +103,7 @@ function Navbar({
     props: {
       className: cn(
         sectionVariants({ variant, maxWidth }),
-        "sticky top-0 p-0 z-30 flex h-(--navbar-height) gap-4 border-b bg-sidebar px-4 text-sidebar-foreground",
+        "sticky top-0 p-0 z-30 flex h-(--navbar-height) gap-4 border-b bg-sidebar px-4 text-sidebar-foreground dark:bg-sidebar/40 dark:backdrop-blur-xl dark:border-white/10",
         className,
       ),
       "data-slot": "navbar",
