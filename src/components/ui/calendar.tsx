@@ -7,6 +7,7 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { cn } from "cn";
+import { ptBR } from "date-fns/locale";
 import * as React from "react";
 import {
   type DayButton,
@@ -22,7 +23,7 @@ function Calendar({
   showOutsideDays = true,
   captionLayout = "label",
   buttonVariant = "ghost",
-  locale,
+  locale = ptBR,
   formatters,
   components,
   ...props
