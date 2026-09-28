@@ -9,7 +9,6 @@ import {
   CartesianGrid,
   Cell,
   ComposedChart,
-  Legend,
   ResponsiveContainer,
   Tooltip,
   type TooltipContentProps,
@@ -38,7 +37,7 @@ interface DayTimelineChartProps {
   onStopClick?: (stop: DayTimelineStop) => void;
 }
 
-const HOURS_IN_DAY = 24;
+const _HOURS_IN_DAY = 24;
 const BAR_HEIGHT = 32;
 const BAR_GAP = 4;
 
@@ -48,6 +47,8 @@ export function DayTimelineChart({
   stops,
   onStopClick,
 }: DayTimelineChartProps) {
+  const isMobile = useIsMobile();
+
   if (!stops || stops.length === 0) {
     return (
       <div className="flex items-center justify-center h-64 text-muted-foreground">
@@ -73,12 +74,25 @@ export function DayTimelineChart({
 
   const totalDwellMinutes = stops.reduce((sum, s) => sum + s.dwellMinutes, 0);
   const totalDwellHours = totalDwellMinutes / 60;
-
-  const isMobile = useIsMobile();
-  const domainMin = chartData.length > 0 ? Math.max(0, Math.floor(Math.min(...chartData.map((d) => d.startHour))) - 1) : 0;
-  const domainMax = chartData.length > 0 ? Math.min(24, Math.ceil(Math.max(...chartData.map((d) => d.timeRange[1]))) + 1) : 24;
+  const domainMin =
+    chartData.length > 0
+      ? Math.max(
+          0,
+          Math.floor(Math.min(...chartData.map((d) => d.startHour))) - 1,
+        )
+      : 0;
+  const domainMax =
+    chartData.length > 0
+      ? Math.min(
+          24,
+          Math.ceil(Math.max(...chartData.map((d) => d.timeRange[1]))) + 1,
+        )
+      : 24;
   const hourSpan = domainMax - domainMin;
-  const ticks = Array.from({ length: Math.ceil(hourSpan / (isMobile && hourSpan > 8 ? 2 : 1)) + 1 }, (_, i) => domainMin + i * (isMobile && hourSpan > 8 ? 2 : 1)).filter(t => t <= 24);
+  const ticks = Array.from(
+    { length: Math.ceil(hourSpan / (isMobile && hourSpan > 8 ? 2 : 1)) + 1 },
+    (_, i) => domainMin + i * (isMobile && hourSpan > 8 ? 2 : 1),
+  ).filter((t) => t <= 24);
 
   const CustomTooltip = ({
     active,
@@ -121,7 +135,8 @@ export function DayTimelineChart({
     <div className="space-y-4">
       <div className="flex items-center justify-center text-sm mb-2">
         <span className="text-muted-foreground font-medium">
-          Tempo Total Parado: {totalDwellHours.toFixed(1)}h ({totalDwellMinutes} min)
+          Tempo Total Parado: {totalDwellHours.toFixed(1)}h ({totalDwellMinutes}{" "}
+          min)
         </span>
       </div>
 
@@ -158,7 +173,8 @@ export function DayTimelineChart({
             tickFormatter={(_, index) => {
               const stop = chartData[index];
               if (!stop) return "";
-              if (isMobile) return `${stop.order}. ${stop.pointName.substring(0, 5)}...`;
+              if (isMobile)
+                return `${stop.order}. ${stop.pointName.substring(0, 5)}...`;
               return `${stop.order}. ${stop.pointName}`;
             }}
             axisLine={false}

@@ -207,9 +207,9 @@ export async function main() {
   const managerId = managerAuth.user.id;
   await db
     .update(user)
-    .set({ 
+    .set({
       document: encrypt("12345678901"),
-      role: "manager" 
+      role: "manager",
     })
     .where(sql`${user.id} = ${managerId}`);
   console.log(`   Manager created: ${MANAGER_EMAIL} (${managerId})`);
@@ -224,20 +224,21 @@ export async function main() {
         password: "demo123456",
       },
     });
-    if (!driverAuth.user) throw new Error(`Failed to create driver ${driver.email}`);
+    if (!driverAuth.user)
+      throw new Error(`Failed to create driver ${driver.email}`);
     const id = driverAuth.user.id;
     driverIds.push(id);
-    
+
     await db
       .update(user)
       .set({
         document: encrypt(
           Math.floor(Math.random() * 90000000000 + 10000000000).toString(),
         ),
-        role: "driver"
+        role: "driver",
       })
       .where(sql`${user.id} = ${id}`);
-    
+
     console.log(`   Driver created: ${driver.name} (${id})`);
   }
 

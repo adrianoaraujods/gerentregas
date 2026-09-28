@@ -154,9 +154,7 @@ export const routesRouter = createRouter({
     }),
 
   startShift: driverProcedure
-    .input(
-      z.object({ routeId: z.string() }).merge(startShiftInputSchema),
-    )
+    .input(z.object({ routeId: z.string() }).merge(startShiftInputSchema))
     .mutation(({ ctx: { db, session }, input }) => {
       const { routeId, ...data } = input;
       return createController(db)
