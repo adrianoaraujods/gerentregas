@@ -33,7 +33,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api/client";
 import { formatTrpcErrorMessage } from "@/lib/api/format-trpc-error";
@@ -196,6 +195,56 @@ export function DriverDayContent({ driverName }: { driverName: string }) {
       .catch((error) => toast.error(formatTrpcErrorMessage(error)));
   };
 
+  const processedStops = useMemo(() => {
+    if (!route) return [];
+    let foundCurrent = false;
+    return route.stops.map((stop) => {
+      const origin = isOrigin(stop);
+      const queued = queuedByStopId.get(stop.id);
+      const stopPending = queued?.status === "pending";
+      const stopRejected = queued?.status === "rejected" ? queued : null;
+      const arrival = formatTime(queued?.arrival ?? stop.arrivalAt);
+      const departure = formatTime(queued?.departure ?? stop.departureAt);
+      const queuedDwellSeconds =
+        stopPending && queued?.arrival && queued?.departure
+          ? stopDwellSeconds({
+              order: stop.order,
+              arrivalAt: queued.arrival,
+              departureAt: queued.departure,
+            })
+          : undefined;
+      const dwell = origin
+        ? null
+        : formatDwell(queuedDwellSeconds ?? stop.dwellSeconds);
+
+      const isCompleted = !!departure;
+
+      let isCurrent = false;
+      if (
+        !origin &&
+        !isCompleted &&
+        !foundCurrent &&
+        route.status === "in_flight"
+      ) {
+        isCurrent = true;
+        foundCurrent = true;
+      }
+
+      return {
+        stop,
+        isOrigin: origin,
+        queued,
+        stopPending,
+        stopRejected,
+        arrival,
+        departure,
+        dwell,
+        isCompleted,
+        isCurrent,
+      };
+    });
+  }, [route?.stops, queuedByStopId, route?.status, route]);
+
   if (isLoadingRoute) {
     return (
       <Card>
@@ -246,32 +295,217 @@ export function DriverDayContent({ driverName }: { driverName: string }) {
     });
   };
 
+  const totalDeliveries = processedStops.filter((s) => !s.isOrigin).length;
+  const completedDeliveries = processedStops.filter(
+    (s) => !s.isOrigin && s.isCompleted,
+  ).length;
+  const progressPct =
+    totalDeliveries > 0 ? (completedDeliveries / totalDeliveries) * 100 : 0;
+
+  const currentStopObj = processedStops.find((s) => s.isCurrent);
+  const otherStops = processedStops.filter((s) => !s.isCurrent);
+
+  const renderStop = ({
+    stop,
+    isOrigin: origin,
+    queued,
+    stopPending,
+    stopRejected,
+    arrival,
+    departure,
+    dwell,
+    isCompleted,
+    isCurrent,
+  }: (typeof processedStops)[0]) => {
+    const isInFlight = route.status === "in_flight";
+    const opacityClass = isCompleted ? "opacity-60" : "";
+    const borderClass = isCurrent ? "border-primary shadow-md border-2" : "";
+
+    return (
+      <Card
+        key={stop.id}
+        className={`${opacityClass} ${borderClass} transition-opacity`}
+      >
+        <CardContent
+          className={`flex flex-col gap-4 py-4 sm:flex-row sm:items-center sm:justify-between ${isCurrent ? "p-5" : ""}`}
+        >
+          <div className="flex items-start gap-4">
+            <span
+              className={`flex shrink-0 items-center justify-center rounded-full font-heading font-bold ${isCurrent ? "size-10 bg-primary text-primary-foreground text-lg" : "size-8 bg-secondary text-sm"}`}
+            >
+              {stop.order}
+            </span>
+            <div className="space-y-1.5">
+              <div className="flex flex-wrap items-center gap-2">
+                <p className={`font-medium ${isCurrent ? "text-lg" : ""}`}>
+                  {stopTitle(stop)}
+                </p>
+                {origin && <Badge variant="outline">Origem</Badge>}
+                {isCurrent && (
+                  <Badge
+                    variant="default"
+                    className="bg-primary/20 text-primary hover:bg-primary/30"
+                  >
+                    Parada Atual
+                  </Badge>
+                )}
+                {stopPending && (
+                  <Badge variant="outline">
+                    <Clock className="mr-1 size-3" />
+                    pendente
+                  </Badge>
+                )}
+                {stopRejected && (
+                  <Badge variant="destructive">
+                    <AlertTriangle className="mr-1 size-3" />
+                    rejeitada
+                  </Badge>
+                )}
+                {!origin && departure && dwell && (
+                  <Badge variant="secondary">
+                    <Timer className="mr-1 size-3" />
+                    {dwell}
+                  </Badge>
+                )}
+              </div>
+              <p
+                className={`text-muted-foreground ${isCurrent ? "text-base" : "text-sm"}`}
+              >
+                {stop.addressSnapshot}
+              </p>
+
+              <div
+                className={`flex flex-wrap gap-x-4 text-muted-foreground ${isCurrent ? "text-sm" : "text-xs"}`}
+              >
+                {origin && (
+                  <span className="inline-flex items-center gap-1">
+                    <Flag className="size-3" />
+                    {departure
+                      ? `Partida às ${departure}`
+                      : "Aguardando início do turno"}
+                  </span>
+                )}
+                {!origin && arrival && (
+                  <span className="inline-flex items-center gap-1">
+                    <LogIn className="size-3" />
+                    Chegada às {arrival} {stopPending && "(pendente)"}
+                  </span>
+                )}
+                {!origin && departure && (
+                  <span className="inline-flex items-center gap-1">
+                    <LogOut className="size-3" />
+                    Saída às {departure} {stopPending && "(pendente)"}
+                  </span>
+                )}
+                {!origin && !arrival && !departure && (
+                  <span className="inline-flex items-center gap-1">
+                    <Timer className="size-3" /> Aguardando chegada
+                  </span>
+                )}
+              </div>
+
+              {stopRejected && (
+                <div className="flex flex-wrap items-center gap-2 mt-2">
+                  <p className="text-sm text-destructive font-medium">
+                    {stopRejected.message}
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => retry(stopRejected.id)}
+                    className="h-8"
+                  >
+                    <RefreshCw className="mr-2 size-4" /> Tentar novamente
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => dismiss(stopRejected.id)}
+                    className="h-8"
+                  >
+                    <Trash2 className="mr-2 size-4" /> Remover
+                  </Button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {!origin && !isCompleted && (
+            <div
+              className={`flex shrink-0 flex-col sm:flex-row gap-2 mt-2 sm:mt-0 ${isCurrent ? "w-full sm:w-auto" : ""}`}
+            >
+              {!arrival && !departure && (
+                <Button
+                  size={isCurrent ? "default" : "sm"}
+                  className={
+                    isCurrent ? "w-full min-h-[48px] sm:w-auto text-base" : ""
+                  }
+                  disabled={
+                    !isInFlight || (isOnline && checkInMutation.isPending)
+                  }
+                  onClick={() => handleCheckIn(stop.id)}
+                >
+                  <LogIn className="mr-2 size-5" /> Registrar chegada
+                </Button>
+              )}
+              {arrival && !departure && (
+                <Button
+                  size={isCurrent ? "default" : "sm"}
+                  className={
+                    isCurrent ? "w-full min-h-[48px] sm:w-auto text-base" : ""
+                  }
+                  disabled={
+                    !isInFlight ||
+                    (isOnline && !queued && checkOutMutation.isPending)
+                  }
+                  onClick={() => handleCheckOut(stop.id)}
+                >
+                  <LogOut className="mr-2 size-5" /> Registrar saída
+                </Button>
+              )}
+            </div>
+          )}
+
+          {!origin && isCompleted && (
+            <div className="flex shrink-0 justify-end mt-2 sm:mt-0">
+              <span className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-600 dark:text-emerald-400">
+                <CheckCircle2 className="size-5" />
+                {stopPending ? "Concluída (pendente)" : "Concluída"}
+              </span>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-20">
       <Card>
-        <CardHeader>
-          <div className="flex flex-wrap items-center justify-between gap-3">
+        <CardHeader className="pb-4">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <CardTitle>Roteiro de hoje</CardTitle>
-              <CardDescription>
+              <CardTitle className="text-xl">Roteiro de hoje</CardTitle>
+              <CardDescription className="text-base mt-1">
                 {driverName}
                 {routeDate ? ` — ${format(routeDate, "dd/MM/yyyy")}` : ""}
               </CardDescription>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <Badge variant={dayState.variant}>{dayState.label}</Badge>
+              <Badge variant={dayState.variant} className="text-sm px-3 py-1">
+                {dayState.label}
+              </Badge>
               {!isOnline && (
-                <Badge variant="secondary">
-                  <WifiOff className="size-3" />
-                  Offline
+                <Badge variant="secondary" className="text-sm px-3 py-1">
+                  <WifiOff className="mr-1.5 size-4" /> Offline
                 </Badge>
               )}
               {pendingCount > 0 && (
-                <Badge variant="outline">
-                  <Clock className="size-3" />
+                <Badge variant="outline" className="text-sm px-3 py-1">
+                  <Clock className="mr-1.5 size-4" />
                   {pendingCount === 1
-                    ? "1 registro pendente"
-                    : `${pendingCount} registros pendentes`}
+                    ? "1 pendente"
+                    : `${pendingCount} pendentes`}
                 </Badge>
               )}
               {pendingCount > 0 && isOnline && (
@@ -280,9 +514,12 @@ export function DriverDayContent({ driverName }: { driverName: string }) {
                   variant="outline"
                   onClick={() => flush()}
                   disabled={isSyncing}
+                  className="h-8"
                 >
-                  <RefreshCw className="size-4" />
-                  {isSyncing ? "Sincronizando..." : "Sincronizar agora"}
+                  <RefreshCw
+                    className={`mr-2 size-4 ${isSyncing ? "animate-spin" : ""}`}
+                  />
+                  {isSyncing ? "Sincronizando..." : "Sincronizar"}
                 </Button>
               )}
             </div>
@@ -290,9 +527,9 @@ export function DriverDayContent({ driverName }: { driverName: string }) {
         </CardHeader>
         <CardContent>
           {route.status === "draft" ? (
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Play className="size-4" />
+            <div className="space-y-5">
+              <div className="flex items-center gap-3 text-muted-foreground bg-secondary/50 p-4 rounded-lg">
+                <Play className="size-5 shrink-0 text-primary" />
                 <p className="text-sm">
                   Inicie o turno para registrar a partida da origem e começar as
                   entregas.
@@ -301,7 +538,7 @@ export function DriverDayContent({ driverName }: { driverName: string }) {
               {route.vehicleId && (
                 <p className="text-sm">
                   Veículo pré-atribuído pelo gerente:{" "}
-                  <span className="font-medium">
+                  <span className="font-semibold">
                     {preAssignedVehicle
                       ? vehicleLabel(preAssignedVehicle)
                       : "vinculado à rota"}
@@ -311,37 +548,39 @@ export function DriverDayContent({ driverName }: { driverName: string }) {
               )}
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                 <Select
-                  value={effectiveVehicleId}
+                  value={effectiveVehicleId ?? undefined}
                   onValueChange={(value) => setSelectedVehicleId(value)}
-                  items={vehicleOptions.map((vehicle: VehicleOutput) => ({
-                    value: vehicle.id,
-                    label: vehicleLabel(vehicle),
+                  items={vehicleOptions.map((v) => ({
+                    value: v.id,
+                    label: vehicleLabel(v),
                   }))}
                 >
                   <SelectTrigger
                     id="vehicle"
-                    className="w-full sm:w-72"
+                    className="w-full sm:w-72 h-12 text-base"
                     aria-label="Selecionar veículo"
                   >
                     <SelectValue placeholder="Selecione um veículo ativo..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {vehicleOptions.map((vehicle: VehicleOutput) => (
+                    {vehicleOptions.map((v) => (
                       <SelectItem
-                        key={vehicle.id}
-                        value={vehicle.id}
-                        label={vehicleLabel(vehicle)}
+                        key={v.id}
+                        value={v.id}
+                        label={vehicleLabel(v)}
+                        className="text-base"
                       >
-                        {vehicleLabel(vehicle)}
+                        {vehicleLabel(v)}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
                 <Button
+                  className="w-full sm:w-auto h-12 text-base"
                   onClick={handleStartShift}
                   disabled={!effectiveVehicleId || startShiftMutation.isPending}
                 >
-                  <Play className="size-4" />
+                  <Play className="mr-2 size-5" />
                   {startShiftMutation.isPending
                     ? "Iniciando..."
                     : "Iniciar turno"}
@@ -349,181 +588,63 @@ export function DriverDayContent({ driverName }: { driverName: string }) {
               </div>
             </div>
           ) : (
-            <div className="flex flex-wrap items-center gap-4 text-sm">
-              <span className="inline-flex items-center gap-2">
-                <Truck className="size-4 text-muted-foreground" />
-                Veículo do dia:{" "}
-                <span className="font-medium">
-                  {preAssignedVehicle
-                    ? vehicleLabel(preAssignedVehicle)
-                    : route.vehicleId
-                      ? "vinculado à rota"
-                      : "não vinculado"}
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+                <span className="inline-flex items-center gap-2">
+                  <Truck className="size-5 text-muted-foreground" />
+                  <span className="text-muted-foreground">Veículo:</span>
+                  <span className="font-semibold text-base">
+                    {preAssignedVehicle
+                      ? vehicleLabel(preAssignedVehicle)
+                      : route.vehicleId
+                        ? "vinculado à rota"
+                        : "não vinculado"}
+                  </span>
                 </span>
-              </span>
-              <Separator orientation="vertical" className="h-4" />
-              <span className="inline-flex items-center gap-2">
-                <Timer className="size-4 text-muted-foreground" />
-                Tempo parado acumulado:{" "}
-                <span className="font-medium">
-                  {formatDwell(route.totalDwellSeconds) ?? "0 s"}
+                <span className="inline-flex items-center gap-2">
+                  <Timer className="size-5 text-muted-foreground" />
+                  <span className="text-muted-foreground">Tempo parado:</span>
+                  <span className="font-semibold text-base">
+                    {formatDwell(route.totalDwellSeconds) ?? "0 s"}
+                  </span>
                 </span>
-              </span>
+              </div>
+
+              <div className="space-y-2 pt-2">
+                <div className="flex justify-between text-sm font-medium">
+                  <span>Progresso das entregas</span>
+                  <span>
+                    {completedDeliveries} de {totalDeliveries}
+                  </span>
+                </div>
+                <div className="h-3 w-full overflow-hidden rounded-full bg-secondary">
+                  <div
+                    className="h-full bg-primary transition-all duration-500 ease-in-out"
+                    style={{ width: `${progressPct}%` }}
+                  />
+                </div>
+              </div>
             </div>
           )}
         </CardContent>
       </Card>
 
+      {currentStopObj && (
+        <div className="space-y-3">
+          <h2 className="text-lg font-bold tracking-tight px-1">
+            Parada Atual
+          </h2>
+          {renderStop(currentStopObj)}
+        </div>
+      )}
+
       <div className="space-y-3">
-        {route.stops.map((stop) => {
-          const origin = isOrigin(stop);
-          const queued = queuedByStopId.get(stop.id);
-          const stopPending = queued?.status === "pending";
-          const stopRejected = queued?.status === "rejected" ? queued : null;
-          const arrival = formatTime(queued?.arrival ?? stop.arrivalAt);
-          const departure = formatTime(queued?.departure ?? stop.departureAt);
-          const queuedDwellSeconds =
-            stopPending && queued?.arrival && queued?.departure
-              ? stopDwellSeconds({
-                  order: stop.order,
-                  arrivalAt: queued.arrival,
-                  departureAt: queued.departure,
-                })
-              : undefined;
-          const dwell = origin
-            ? null
-            : formatDwell(queuedDwellSeconds ?? stop.dwellSeconds);
-          const isInFlight = route.status === "in_flight";
-
-          return (
-            <Card key={stop.id}>
-              <CardContent className="flex flex-col gap-3 py-1 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-start gap-3">
-                  <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-secondary font-heading text-sm font-medium">
-                    {stop.order}
-                  </span>
-                  <div className="space-y-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-medium">{stopTitle(stop)}</p>
-                      {origin && <Badge variant="outline">Origem</Badge>}
-                      {stopPending && (
-                        <Badge variant="outline">
-                          <Clock className="size-3" />
-                          pendente
-                        </Badge>
-                      )}
-                      {stopRejected && (
-                        <Badge variant="destructive">
-                          <AlertTriangle className="size-3" />
-                          rejeitada
-                        </Badge>
-                      )}
-                      {!origin && departure && dwell && (
-                        <Badge variant="secondary">
-                          <Timer className="size-3" />
-                          {dwell}
-                        </Badge>
-                      )}
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      {stop.addressSnapshot}
-                    </p>
-                    <div className="flex flex-wrap gap-x-4 text-xs text-muted-foreground">
-                      {origin && (
-                        <span>
-                          {departure
-                            ? `Partida da base às ${departure}`
-                            : "Aguardando início do turno"}
-                        </span>
-                      )}
-                      {!origin && arrival && (
-                        <span>
-                          Chegada às {arrival}
-                          {stopPending ? " (pendente)" : ""}
-                        </span>
-                      )}
-                      {!origin && departure && (
-                        <span>
-                          Saída às {departure}
-                          {stopPending ? " (pendente)" : ""}
-                        </span>
-                      )}
-                      {!origin && !arrival && !departure && (
-                        <span>Aguardando chegada</span>
-                      )}
-                    </div>
-                    {stopRejected && (
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-xs text-destructive">
-                          {stopRejected.message}
-                        </p>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => retry(stopRejected.id)}
-                        >
-                          <RefreshCw className="size-4" />
-                          Tentar novamente
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => dismiss(stopRejected.id)}
-                        >
-                          <Trash2 className="size-4" />
-                          Remover
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {!origin && (
-                  <div className="flex shrink-0 justify-end">
-                    {!arrival && !departure && (
-                      <Button
-                        size="sm"
-                        disabled={
-                          !isInFlight || (isOnline && checkInMutation.isPending)
-                        }
-                        onClick={() => handleCheckIn(stop.id)}
-                      >
-                        <LogIn className="size-4" />
-                        Registrar chegada
-                      </Button>
-                    )}
-                    {arrival && !departure && (
-                      <Button
-                        size="sm"
-                        disabled={
-                          !isInFlight ||
-                          (isOnline && !queued && checkOutMutation.isPending)
-                        }
-                        onClick={() => handleCheckOut(stop.id)}
-                      >
-                        <LogOut className="size-4" />
-                        Registrar saída
-                      </Button>
-                    )}
-                    {departure && (
-                      <span className="inline-flex items-center gap-2 text-sm text-muted-foreground">
-                        <CheckCircle2 className="size-4" />
-                        {stopPending ? "Concluída (pendente)" : "Concluída"}
-                      </span>
-                    )}
-                  </div>
-                )}
-
-                {origin && (
-                  <span className="hidden shrink-0 items-center gap-2 text-xs text-muted-foreground sm:inline-flex">
-                    <Flag className="size-4" />
-                    Sem registro de chegada
-                  </span>
-                )}
-              </CardContent>
-            </Card>
-          );
-        })}
+        {otherStops.length > 0 && (
+          <h2 className="text-lg font-bold tracking-tight px-1 mt-4">
+            Lista de Paradas
+          </h2>
+        )}
+        {otherStops.map(renderStop)}
       </div>
     </div>
   );
