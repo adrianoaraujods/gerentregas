@@ -46,7 +46,11 @@ export function LoginForm() {
       }
 
       const callbackUrl = searchParams.get("callbackUrl");
-      if (callbackUrl && callbackUrl.startsWith("/") && !callbackUrl.startsWith("//")) {
+      if (
+        callbackUrl &&
+        callbackUrl.startsWith("/") &&
+        !callbackUrl.startsWith("//")
+      ) {
         router.push(callbackUrl);
       } else {
         router.push("/");

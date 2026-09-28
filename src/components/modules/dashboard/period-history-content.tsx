@@ -1,7 +1,7 @@
 "use client";
 
-import * as React from "react";
 import { keepPreviousData } from "@tanstack/react-query";
+import * as React from "react";
 import { DataTable, useAppTable } from "@/components/data-table";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -37,7 +37,8 @@ export function PeriodHistoryContent({
 
   const isPeriodValid = () => {
     if (periodType === "day" && !date) return false;
-    if (periodType === "custom" && (!dateRange.from || !dateRange.to)) return false;
+    if (periodType === "custom" && (!dateRange.from || !dateRange.to))
+      return false;
     return true;
   };
 
@@ -57,12 +58,12 @@ export function PeriodHistoryContent({
 
   const utils = api.useUtils();
 
-  const { 
-    data: drilldown, 
+  const {
+    data: drilldown,
     isLoading: loadingDrilldown,
     isFetching,
     isError,
-    refetch 
+    refetch,
   } = api.dashboard.getDrilldown.useQuery(buildQueryParams(), {
     enabled: isPeriodValid(),
     placeholderData: keepPreviousData,
@@ -97,7 +98,9 @@ export function PeriodHistoryContent({
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground">
             <p className="mb-4">Ocorreu um erro ao carregar os dados.</p>
-            <Button variant="outline" onClick={() => refetch()}>Tentar novamente</Button>
+            <Button variant="outline" onClick={() => refetch()}>
+              Tentar novamente
+            </Button>
           </CardContent>
         </Card>
       );
@@ -128,19 +131,29 @@ export function PeriodHistoryContent({
     }
 
     return (
-      <div className={isFetching ? "opacity-60 transition-opacity" : "transition-opacity"}>
+      <div
+        className={
+          isFetching ? "opacity-60 transition-opacity" : "transition-opacity"
+        }
+      >
         <div className="grid gap-4 md:grid-cols-4 mb-6">
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Total de Paradas</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                Total de Paradas
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold tabular-nums">{stops.length}</div>
+              <div className="text-3xl font-bold tabular-nums">
+                {stops.length}
+              </div>
             </CardContent>
           </Card>
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Tempo Total Parado</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                Tempo Total Parado
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold tabular-nums">
@@ -153,7 +166,9 @@ export function PeriodHistoryContent({
           </Card>
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">% da Jornada Padrão</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                % da Jornada Padrão
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold tabular-nums">
@@ -163,7 +178,9 @@ export function PeriodHistoryContent({
           </Card>
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Paradas c/ Tempo Parado</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                Paradas c/ Tempo Parado
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold tabular-nums">
@@ -175,7 +192,10 @@ export function PeriodHistoryContent({
 
         <Card>
           <CardContent className="pt-0">
-            <DataTable table={table} toolbarProps={{ searchPlaceholder: "Pesquisar paradas..." }} />
+            <DataTable
+              table={table}
+              toolbarProps={{ searchPlaceholder: "Pesquisar paradas..." }}
+            />
           </CardContent>
         </Card>
       </div>
@@ -186,10 +206,19 @@ export function PeriodHistoryContent({
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Histórico de Período</h1>
-          <p className="text-muted-foreground">Lista detalhada de paradas com tempos de permanência</p>
+          <h1 className="text-2xl font-bold tracking-tight">
+            Histórico de Período
+          </h1>
+          <p className="text-muted-foreground">
+            Lista detalhada de paradas com tempos de permanência
+          </p>
         </div>
-        <CsvExportButton onExport={handleCsvExport} disabled={!isPeriodValid() || loadingDrilldown || isError || !drilldown} />
+        <CsvExportButton
+          onExport={handleCsvExport}
+          disabled={
+            !isPeriodValid() || loadingDrilldown || isError || !drilldown
+          }
+        />
       </div>
 
       <Card>

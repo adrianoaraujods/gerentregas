@@ -1,9 +1,9 @@
 "use client";
 
+import { keepPreviousData } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import * as React from "react";
-import { keepPreviousData } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -92,7 +92,8 @@ export function DashboardContent() {
 
   const isPeriodValid = () => {
     if (periodType === "day" && !date) return false;
-    if (periodType === "custom" && (!dateRange.from || !dateRange.to)) return false;
+    if (periodType === "custom" && (!dateRange.from || !dateRange.to))
+      return false;
     return true;
   };
 
@@ -110,12 +111,12 @@ export function DashboardContent() {
     return input;
   };
 
-  const { 
-    data: aggregationRaw, 
+  const {
+    data: aggregationRaw,
     isLoading: loadingAggregation,
     isFetching,
     isError,
-    refetch 
+    refetch,
   } = api.dashboard.getAggregation.useQuery(buildInput(), {
     enabled: isPeriodValid(),
     placeholderData: keepPreviousData,
@@ -144,7 +145,7 @@ export function DashboardContent() {
     }
 
     const promise = utils.dashboard.getDrilldown.fetch(drilldownInput);
-    
+
     toast.promise(promise, {
       loading: "Buscando detalhes do dia...",
       success: "Detalhes carregados com sucesso.",
@@ -223,7 +224,9 @@ export function DashboardContent() {
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground">
             <p className="mb-4">Ocorreu um erro ao carregar os dados.</p>
-            <Button variant="outline" onClick={() => refetch()}>Tentar novamente</Button>
+            <Button variant="outline" onClick={() => refetch()}>
+              Tentar novamente
+            </Button>
           </CardContent>
         </Card>
       );
@@ -233,9 +236,21 @@ export function DashboardContent() {
       return (
         <div className="space-y-4">
           <div className="grid gap-4 md:grid-cols-3">
-            <Card><CardContent className="pt-6"><Skeleton className="h-16 w-full" /></CardContent></Card>
-            <Card><CardContent className="pt-6"><Skeleton className="h-16 w-full" /></CardContent></Card>
-            <Card><CardContent className="pt-6"><Skeleton className="h-16 w-full" /></CardContent></Card>
+            <Card>
+              <CardContent className="pt-6">
+                <Skeleton className="h-16 w-full" />
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <Skeleton className="h-16 w-full" />
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <Skeleton className="h-16 w-full" />
+              </CardContent>
+            </Card>
           </div>
           <Card>
             <CardContent className="pt-6">
@@ -246,7 +261,10 @@ export function DashboardContent() {
       );
     }
 
-    if (!aggregation || (aggregation.stops?.length === 0 && aggregation.days?.length === 0)) {
+    if (
+      !aggregation ||
+      (aggregation.stops?.length === 0 && aggregation.days?.length === 0)
+    ) {
       return (
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
@@ -257,11 +275,17 @@ export function DashboardContent() {
     }
 
     return (
-      <div className={isFetching ? "opacity-60 transition-opacity" : "transition-opacity"}>
+      <div
+        className={
+          isFetching ? "opacity-60 transition-opacity" : "transition-opacity"
+        }
+      >
         <div className="grid gap-4 md:grid-cols-3 mb-6">
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Tempo Total Parado</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                Tempo Total Parado
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold tabular-nums">
@@ -274,7 +298,9 @@ export function DashboardContent() {
           </Card>
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">% da Jornada Padrão</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                % da Jornada Padrão
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold tabular-nums">
@@ -298,7 +324,8 @@ export function DashboardContent() {
             <CardContent>
               <div className="text-3xl font-bold tabular-nums">
                 {periodType === "day"
-                  ? aggregation.stops?.filter((s) => s.dwellMinutes > 0).length || 0
+                  ? aggregation.stops?.filter((s) => s.dwellMinutes > 0)
+                      .length || 0
                   : aggregation.days?.length || 0}
               </div>
             </CardContent>
@@ -323,7 +350,9 @@ export function DashboardContent() {
         </div>
         <CsvExportButton
           onExport={handleCsvExport}
-          disabled={!isPeriodValid() || loadingAggregation || isError || !aggregation}
+          disabled={
+            !isPeriodValid() || loadingAggregation || isError || !aggregation
+          }
         />
       </div>
 
