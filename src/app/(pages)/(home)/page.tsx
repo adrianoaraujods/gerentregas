@@ -5,7 +5,7 @@ export default async function HomePage() {
   const session = await getSession();
 
   if (!session) {
-    return null;
+    redirect("/entrar");
   }
 
   const role = session.user.role;

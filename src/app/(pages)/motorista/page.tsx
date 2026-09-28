@@ -1,12 +1,20 @@
-import { notFound } from "next/navigation";
+import { redirect } from "next/navigation";
 import { GridPattern } from "@/components/layout/background-patterns";
+import { RestrictedAccess } from "@/components/modules/auth/restricted-access";
 import { DriverDayContent } from "@/components/modules/driver/driver-day-content";
 import { getSession } from "@/lib/auth/server";
 import type { User } from "@/server/modules/auth";
 
 export default async function MotoristaPage() {
   const session = await getSession();
-  if (session?.user.role !== "driver") notFound();
+  
+  if (!session) {
+    redirect("/entrar?callbackUrl=%2Fmotorista");
+  }
+
+  if (session.user.role !== "driver") {
+    return <RestrictedAccess role={session.user.role} />;
+  }
 
   const user = session.user as User;
 
