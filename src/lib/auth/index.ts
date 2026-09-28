@@ -22,6 +22,11 @@ const baseURL = process.env.BETTER_AUTH_URL ?? {
 export const auth = betterAuth({
   baseURL,
   database: drizzleAdapter(db, { provider: "pg", schema }),
+  advanced: {
+    database: {
+      generateId: () => crypto.randomUUID(),
+    },
+  },
   emailAndPassword: {
     enabled: true,
     sendResetPassword: async ({ user: { email }, url }) => {

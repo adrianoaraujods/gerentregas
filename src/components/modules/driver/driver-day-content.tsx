@@ -36,6 +36,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api/client";
+import { formatTrpcErrorMessage } from "@/lib/api/format-trpc-error";
 import type { QueuedStopEvent } from "@/lib/sync/sync-client";
 import { useSyncQueue } from "@/lib/sync/use-sync-queue";
 import type { RouterOutputs } from "@/server/api/router";
@@ -135,7 +136,7 @@ export function DriverDayContent({ driverName }: { driverName: string }) {
       invalidateRoute();
     },
     onError: (error) => {
-      toast.error(error.message || "Erro ao iniciar o turno");
+      toast.error(formatTrpcErrorMessage(error, "Erro ao iniciar o turno"));
     },
   });
 
@@ -145,7 +146,7 @@ export function DriverDayContent({ driverName }: { driverName: string }) {
       invalidateRoute();
     },
     onError: (error) => {
-      toast.error(error.message || "Erro ao registrar a chegada");
+      toast.error(formatTrpcErrorMessage(error, "Erro ao registrar a chegada"));
     },
   });
 
@@ -157,7 +158,7 @@ export function DriverDayContent({ driverName }: { driverName: string }) {
       invalidateRoute();
     },
     onError: (error) => {
-      toast.error(error.message || "Erro ao registrar a saída");
+      toast.error(formatTrpcErrorMessage(error, "Erro ao registrar a saída"));
     },
   });
 
@@ -172,7 +173,7 @@ export function DriverDayContent({ driverName }: { driverName: string }) {
           "Sem conexão: chegada salva na fila e marcada como pendente.",
         ),
       )
-      .catch((error) => toast.error(error.message));
+      .catch((error) => toast.error(formatTrpcErrorMessage(error)));
   };
 
   const handleCheckOut = (stopId: string) => {
@@ -191,7 +192,7 @@ export function DriverDayContent({ driverName }: { driverName: string }) {
           "Sem conexão: saída salva na fila e marcada como pendente.",
         );
       })
-      .catch((error) => toast.error(error.message));
+      .catch((error) => toast.error(formatTrpcErrorMessage(error)));
   };
 
   if (isLoadingRoute) {

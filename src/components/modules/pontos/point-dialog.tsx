@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { api } from "@/lib/api/client";
+import { formatTrpcErrorMessage } from "@/lib/api/format-trpc-error";
 import type { RouterOutputs } from "@/server/api/router";
 
 type ClientPoint = RouterOutputs["points"]["list"]["points"][number];
@@ -68,7 +69,7 @@ export function PointDialog({
       onOpenChange(false);
     },
     onError: (error) => {
-      toast.error(`Erro ao criar ponto: ${error.message}`);
+      toast.error(`Erro ao criar ponto: ${formatTrpcErrorMessage(error)}`);
     },
   });
 
@@ -79,7 +80,7 @@ export function PointDialog({
       onOpenChange(false);
     },
     onError: (error) => {
-      toast.error(`Erro ao atualizar ponto: ${error.message}`);
+      toast.error(`Erro ao atualizar ponto: ${formatTrpcErrorMessage(error)}`);
     },
   });
 

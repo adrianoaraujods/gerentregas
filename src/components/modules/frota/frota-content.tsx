@@ -40,6 +40,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { api } from "@/lib/api/client";
+import { formatTrpcErrorMessage } from "@/lib/api/format-trpc-error";
 import type { VehicleOutput } from "@/server/modules/fleet";
 
 const columnHelper = createAppColumnHelper<VehicleOutput>();
@@ -85,7 +86,7 @@ export function FrotaContent() {
       closeModal();
     },
     onError: (err) => {
-      toast.error(err.message || "Erro ao cadastrar veículo");
+      toast.error(formatTrpcErrorMessage(err, "Erro ao cadastrar veículo"));
     },
   });
 
@@ -96,7 +97,7 @@ export function FrotaContent() {
       closeModal();
     },
     onError: (err) => {
-      toast.error(err.message || "Erro ao atualizar veículo");
+      toast.error(formatTrpcErrorMessage(err, "Erro ao atualizar veículo"));
     },
   });
 
@@ -111,7 +112,7 @@ export function FrotaContent() {
       setVehicleToDelete(null);
     },
     onError: (err) => {
-      toast.error(err.message || "Erro ao excluir veículo");
+      toast.error(formatTrpcErrorMessage(err, "Erro ao excluir veículo"));
     },
   });
 
@@ -121,7 +122,7 @@ export function FrotaContent() {
       utils.fleet.list.invalidate();
     },
     onError: (err) => {
-      toast.error(err.message || "Erro ao restaurar veículo");
+      toast.error(formatTrpcErrorMessage(err, "Erro ao restaurar veículo"));
     },
   });
 

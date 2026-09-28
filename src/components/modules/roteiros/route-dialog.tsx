@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { api } from "@/lib/api/client";
+import { formatTrpcErrorMessage } from "@/lib/api/format-trpc-error";
 
 interface RouteDialogProps {
   open: boolean;
@@ -81,8 +82,8 @@ export function RouteDialog({
       onSuccess();
       onOpenChange(false);
     },
-    onError: (error: { message: string }) => {
-      toast.error(`Erro ao criar roteiro: ${error.message}`);
+    onError: (error) => {
+      toast.error(`Erro ao criar roteiro: ${formatTrpcErrorMessage(error)}`);
     },
   });
 
@@ -92,8 +93,10 @@ export function RouteDialog({
       utils.routes.get.invalidate({ id: routeId ?? "" });
       utils.routes.list.invalidate();
     },
-    onError: (error: { message: string }) => {
-      toast.error(`Erro ao atualizar roteiro: ${error.message}`);
+    onError: (error) => {
+      toast.error(
+        `Erro ao atualizar roteiro: ${formatTrpcErrorMessage(error)}`,
+      );
     },
   });
 
@@ -104,8 +107,8 @@ export function RouteDialog({
       utils.routes.list.invalidate();
       setNewStopPointId("");
     },
-    onError: (error: { message: string }) => {
-      toast.error(`Erro ao adicionar parada: ${error.message}`);
+    onError: (error) => {
+      toast.error(`Erro ao adicionar parada: ${formatTrpcErrorMessage(error)}`);
     },
   });
 
@@ -115,8 +118,8 @@ export function RouteDialog({
       utils.routes.get.invalidate({ id: routeId ?? "" });
       utils.routes.list.invalidate();
     },
-    onError: (error: { message: string }) => {
-      toast.error(`Erro ao remover parada: ${error.message}`);
+    onError: (error) => {
+      toast.error(`Erro ao remover parada: ${formatTrpcErrorMessage(error)}`);
     },
   });
 

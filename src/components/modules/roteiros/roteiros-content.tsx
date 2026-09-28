@@ -24,6 +24,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api/client";
+import { formatTrpcErrorMessage } from "@/lib/api/format-trpc-error";
 import type { RouterOutputs } from "@/server/api/router";
 
 import { RouteDialog } from "./route-dialog";
@@ -79,8 +80,8 @@ export function RoteirosContent() {
       utils.routes.list.invalidate();
       setRouteToDelete(null);
     },
-    onError: (error: { message: string }) => {
-      toast.error(`Erro ao excluir roteiro: ${error.message}`);
+    onError: (error) => {
+      toast.error(`Erro ao excluir roteiro: ${formatTrpcErrorMessage(error)}`);
     },
   });
 
