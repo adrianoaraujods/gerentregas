@@ -7,17 +7,20 @@ import { db } from "@/server/db";
 import { schema } from "@/server/db/schemas";
 import { MIN_PASSWORD_LENGTH, USER_ROLES } from "@/server/db/schemas/auth";
 
-const baseURL = process.env.BETTER_AUTH_URL ?? {
-  allowedHosts: [
-    process.env.VERCEL_PROJECT_PRODUCTION_URL,
-    process.env.VERCEL_URL,
-    process.env.VERCEL_BRANCH_URL,
-    "localhost:3000",
-  ].filter((host): host is string => Boolean(host)),
-  fallback: process.env.VERCEL_PROJECT_PRODUCTION_URL
-    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
-    : "http://localhost:3000",
-};
+const baseURL =
+  process.env.CODESPACE_NAME
+    ? `https://${process.env.CODESPACE_NAME}-3000.app.github.dev`
+    : process.env.BETTER_AUTH_URL ?? {
+        allowedHosts: [
+          process.env.VERCEL_PROJECT_PRODUCTION_URL,
+          process.env.VERCEL_URL,
+          process.env.VERCEL_BRANCH_URL,
+          "localhost:3000",
+        ].filter((host): host is string => Boolean(host)),
+        fallback: process.env.VERCEL_PROJECT_PRODUCTION_URL
+          ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+          : "http://localhost:3000",
+      };
 
 export const auth = betterAuth({
   baseURL,
