@@ -16,6 +16,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { useIsMobile } from "@/components/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 
 interface DayTimelineStop {
@@ -73,6 +74,12 @@ export function DayTimelineChart({
   const totalDwellMinutes = stops.reduce((sum, s) => sum + s.dwellMinutes, 0);
   const totalDwellHours = totalDwellMinutes / 60;
 
+  const isMobile = useIsMobile();
+  const domainMin = chartData.length > 0 ? Math.max(0, Math.floor(Math.min(...chartData.map((d) => d.startHour))) - 1) : 0;
+  const domainMax = chartData.length > 0 ? Math.min(24, Math.ceil(Math.max(...chartData.map((d) => d.timeRange[1]))) + 1) : 24;
+  const hourSpan = domainMax - domainMin;
+  const ticks = Array.from({ length: Math.ceil(hourSpan / (isMobile && hourSpan > 8 ? 2 : 1)) + 1 }, (_, i) => domainMin + i * (isMobile && hourSpan > 8 ? 2 : 1)).filter(t => t <= 24);
+
   const CustomTooltip = ({
     active,
     payload,
@@ -88,7 +95,7 @@ export function DayTimelineChart({
       : "—";
 
     return (
-      <div className="bg-popover border border-border rounded-lg p-3 shadow-lg min-w-[200px]">
+      <div className="bg-popover/80 backdrop-blur-md border border-border/50 dark:border-white/10 rounded-lg p-3 shadow-xl min-w-[200px]">
         <p className="font-medium">{item.pointName}</p>
         <p className="text-sm text-muted-foreground">{item.address}</p>
         <div className="mt-2 grid grid-cols-2 gap-1 text-xs">
@@ -112,12 +119,10 @@ export function DayTimelineChart({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between text-sm">
-        <span className="text-muted-foreground">00:00</span>
-        <span className="text-muted-foreground">
-          Total: {totalDwellHours.toFixed(1)}h ({totalDwellMinutes} min)
+      <div className="flex items-center justify-center text-sm mb-2">
+        <span className="text-muted-foreground font-medium">
+          Tempo Total Parado: {totalDwellHours.toFixed(1)}h ({totalDwellMinutes} min)
         </span>
-        <span className="text-muted-foreground">23:59</span>
       </div>
 
       <ResponsiveContainer
@@ -127,7 +132,7 @@ export function DayTimelineChart({
         <ComposedChart
           data={chartData}
           layout="horizontal"
-          margin={{ top: 20, right: 20, bottom: 40, left: 120 }}
+          margin={{ top: 20, right: 20, bottom: 40, left: isMobile ? 0 : 120 }}
         >
           <CartesianGrid
             horizontal={false}
@@ -137,8 +142,8 @@ export function DayTimelineChart({
           />
           <XAxis
             type="number"
-            domain={[0, HOURS_IN_DAY]}
-            tickCount={HOURS_IN_DAY + 1}
+            domain={[domainMin, domainMax]}
+            ticks={ticks}
             tickFormatter={(value) => `${String(value).padStart(2, "0")}:00`}
             tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
             axisLine={{ stroke: "var(--border)" }}
@@ -148,19 +153,21 @@ export function DayTimelineChart({
           <YAxis
             type="category"
             dataKey="index"
-            width={120}
+            width={isMobile ? 50 : 120}
             tick={{ fontSize: 11 }}
             tickFormatter={(_, index) => {
               const stop = chartData[index];
-              return stop ? `${stop.order}. ${stop.pointName}` : "";
+              if (!stop) return "";
+              if (isMobile) return `${stop.order}. ${stop.pointName.substring(0, 5)}...`;
+              return `${stop.order}. ${stop.pointName}`;
             }}
             axisLine={false}
             tickLine={false}
           />
           <Tooltip content={CustomTooltipWrapper} />
-          <Legend />
           <BarWrapper
             dataKey="timeRange"
+            name="Horas Parado"
             radius={[4, 4, 4, 4]}
             minPointSize={0}
             shape={(
@@ -225,7 +232,7 @@ export function DayTimelineChart({
             className={cn(
               "inline-flex items-center gap-1 px-2 py-1 rounded",
               "bg-background border",
-              onStopClick && "cursor-pointer hover:bg-accent",
+              onStopClick && "cursor-pointer hover:bg-muted",
             )}
             onClick={() => onStopClick?.(stop)}
             style={{ borderColor: `var(--chart-${(index % 5) + 1})` }}
