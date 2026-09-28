@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
 import AdminSidebar from "@/components/layout/admin-sidebar";
-import { GridPattern } from "@/components/layout/background-patterns";
 import { RestrictedAccess } from "@/components/modules/auth/restricted-access";
 import {
   SidebarInset,
@@ -28,17 +27,17 @@ export default async function AdminLayout({
   }
 
   return (
-    <SidebarProvider className="min-h-svh" defaultOpen>
+    <SidebarProvider className="min-h-svh bg-zinc-950" defaultOpen>
       <AdminSidebar user={session.user as User} />
 
-      <SidebarInset>
-        <header className="flex h-(--navbar-height) items-center border-b px-4">
+      <SidebarInset className="bg-transparent overflow-hidden">
+        <header className="flex h-(--navbar-height) items-center shrink-0 gap-2 m-4 rounded-xl border border-white/10 bg-background/60 backdrop-blur-xl px-4 shadow-sm relative z-50">
           <SidebarTrigger className="-ml-1" />
         </header>
 
-        <GridPattern className="flex-1 overflow-y-auto p-5 sm:p-7">
+        <main className="flex-1 overflow-hidden relative">
           {children}
-        </GridPattern>
+        </main>
       </SidebarInset>
     </SidebarProvider>
   );

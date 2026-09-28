@@ -58,7 +58,7 @@ export default function AdminSidebar({ user }: { user: User }) {
   const pathname = usePathname();
 
   return (
-    <Sidebar collapsible="icon">
+    <Sidebar collapsible="icon" variant="floating">
       <SidebarHeader>
         <div className="flex h-10 items-center gap-2.5 px-2">
           <Link href="/admin">

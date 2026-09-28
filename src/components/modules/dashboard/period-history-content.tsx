@@ -10,10 +10,7 @@ import { api } from "@/lib/api/client";
 import type { GetAggregationInput } from "@/server/modules/dashboard";
 import { CsvExportButton } from "./csv-export";
 import { buildDrilldownColumns } from "./drilldown-columns";
-import { PeriodSelector } from "./period-selector";
-
-type PeriodType = "day" | "month" | "custom";
-
+import { PeriodSelector, type PeriodType } from "./period-selector";
 interface PeriodHistoryContentProps {
   defaultPeriodType?: PeriodType;
 }

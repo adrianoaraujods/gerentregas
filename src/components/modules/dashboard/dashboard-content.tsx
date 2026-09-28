@@ -15,6 +15,7 @@ import { CsvExportButton } from "./csv-export";
 import { DayTimelineChart } from "./day-timeline-chart";
 import { DrilldownModal } from "./drilldown-modal";
 import { PeriodSelector } from "./period-selector";
+import { DashboardMap } from "./dashboard-map";
 
 type PeriodType = "day" | "month" | "custom";
 
@@ -340,48 +341,55 @@ export function DashboardContent() {
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground">
-            Visualização de tempo parado por período
-          </p>
+    <>
+      <DashboardMap />
+      <div className="relative z-10 h-full overflow-y-auto p-5 sm:p-7 space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 pointer-events-none">
+          <div className="pointer-events-auto bg-background/60 backdrop-blur-xl p-4 rounded-xl border border-white/10 shadow-lg">
+            <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+            <p className="text-muted-foreground">
+              Visualização de tempo parado por período
+            </p>
+          </div>
+          <div className="pointer-events-auto bg-background/60 backdrop-blur-xl p-2 rounded-xl border border-white/10 shadow-lg">
+            <CsvExportButton
+              onExport={handleCsvExport}
+              disabled={
+                !isPeriodValid() || loadingAggregation || isError || !aggregation
+              }
+            />
+          </div>
         </div>
-        <CsvExportButton
-          onExport={handleCsvExport}
-          disabled={
-            !isPeriodValid() || loadingAggregation || isError || !aggregation
-          }
+
+        <Card className="pointer-events-auto bg-background/60 backdrop-blur-xl border-white/10 shadow-xl w-fit">
+          <CardContent className="pt-6">
+            <PeriodSelector
+              periodType={periodType}
+              onPeriodTypeChange={setPeriodType}
+              date={date}
+              onDateChange={setDate}
+              month={month}
+              onMonthChange={setMonth}
+              dateRange={dateRange}
+              onDateRangeChange={setDateRange}
+            />
+          </CardContent>
+        </Card>
+
+        <div className="pointer-events-auto">
+          {renderDataRegion()}
+        </div>
+
+        <DrilldownModal
+          open={drilldownOpen}
+          onOpenChange={setDrilldownOpen}
+          title={drilldownTitle}
+          stops={drilldownStops}
+          totalDwellMinutes={drilldownTotal}
+          workdayPercentage={drilldownWorkdayPct}
+          onExportCSV={handleCsvExport}
         />
       </div>
-
-      <Card>
-        <CardContent className="pt-6">
-          <PeriodSelector
-            periodType={periodType}
-            onPeriodTypeChange={setPeriodType}
-            date={date}
-            onDateChange={setDate}
-            month={month}
-            onMonthChange={setMonth}
-            dateRange={dateRange}
-            onDateRangeChange={setDateRange}
-          />
-        </CardContent>
-      </Card>
-
-      {renderDataRegion()}
-
-      <DrilldownModal
-        open={drilldownOpen}
-        onOpenChange={setDrilldownOpen}
-        title={drilldownTitle}
-        stops={drilldownStops}
-        totalDwellMinutes={drilldownTotal}
-        workdayPercentage={drilldownWorkdayPct}
-        onExportCSV={handleCsvExport}
-      />
-    </div>
+    </>
   );
 }
