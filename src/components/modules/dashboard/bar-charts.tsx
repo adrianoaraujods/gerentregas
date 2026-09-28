@@ -9,7 +9,6 @@ import {
   type BarRectangleItem,
   CartesianGrid,
   Cell,
-  Legend,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
@@ -17,6 +16,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { useIsMobile } from "@/components/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 
 interface DailyAggregation {
@@ -55,9 +55,9 @@ export function MonthBarChart({
     return (
       <div className="flex items-center justify-center h-64 text-muted-foreground">
         <p>Nenhum dado para o período selecionado.</p>
-      </div>
-    );
   }
+
+  const isMobile = useIsMobile();
 
   const chartData = data.map((d, index) => {
     const dwellHoursNum = Number((d.totalDwellMinutes / 60).toFixed(2));
@@ -96,7 +96,7 @@ export function MonthBarChart({
     });
 
     return (
-      <div className="bg-popover border border-border rounded-lg p-3 shadow-lg min-w-[220px]">
+      <div className="bg-popover/80 backdrop-blur-md border border-border/50 dark:border-white/10 rounded-lg p-3 shadow-xl min-w-[220px]">
         <p className="font-medium">{date}</p>
         <div className="mt-2 grid grid-cols-2 gap-1 text-xs">
           <span className="text-muted-foreground">Tempo parado:</span>
@@ -122,15 +122,16 @@ export function MonthBarChart({
       {title && (
         <h3 className="text-sm font-medium text-muted-foreground">{title}</h3>
       )}
-      <ResponsiveContainer
-        width="100%"
-        height={Math.max(data.length * 35 + 100, 300)}
-      >
-        <BarChart
-          layout="vertical"
-          data={chartData}
-          margin={{ top: 20, right: 20, bottom: 40, left: 80 }}
+      <div className="max-h-[420px] overflow-y-auto overflow-x-hidden pr-2">
+        <ResponsiveContainer
+          width="100%"
+          height={Math.max(data.length * 35 + 100, 300)}
         >
+          <BarChart
+            layout="vertical"
+            data={chartData}
+            margin={{ top: 20, right: 20, bottom: 40, left: isMobile ? 0 : 80 }}
+          >
           <CartesianGrid
             horizontal
             strokeDasharray="4 4"
@@ -148,14 +149,13 @@ export function MonthBarChart({
           <YAxis
             type="category"
             dataKey="label"
-            width={80}
+            width={isMobile ? 50 : 80}
             tick={{ fontSize: 11 }}
             axisLine={false}
             tickLine={false}
             tickMargin={10}
           />
           <Tooltip content={CustomTooltipWrapper} />
-          <Legend />
           {showWorkdayLine && workdayMinutes > 0 && (
             <ReferenceLine
               x={workdayHours}
@@ -172,6 +172,7 @@ export function MonthBarChart({
           )}
           <BarWrapper
             dataKey="dwellHoursNum"
+            name="Horas Parado"
             radius={[0, 4, 4, 0]}
             minPointSize={0}
             onClick={handleBarClick}
@@ -185,6 +186,7 @@ export function MonthBarChart({
           </BarWrapper>
         </BarChart>
       </ResponsiveContainer>
+      </div>
 
       <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
         {chartData.map((day) => (
@@ -194,7 +196,7 @@ export function MonthBarChart({
             className={cn(
               "inline-flex items-center gap-1 px-2 py-1 rounded",
               "bg-background border",
-              onBarClick && "cursor-pointer hover:bg-accent",
+              onBarClick && "cursor-pointer hover:bg-muted",
             )}
             onClick={() => onBarClick?.(day)}
             style={{
