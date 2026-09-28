@@ -52,21 +52,6 @@ export const routesRouter = createRouter({
         .then(routeWithStopsOutputSchema.parse),
     ),
 
-  getMyRoute: driverProcedure
-    .input(
-      z.object({
-        date: z.iso.datetime({ local: true }).optional(),
-      }),
-    )
-    .query(({ ctx: { db, session }, input }) => {
-      const date = input.date ? new Date(input.date) : new Date();
-      return createController(db)
-        .getDriverRoute(session.user.id, date)
-        .then((result) =>
-          result ? driverRouteOutputSchema.parse(result) : null,
-        );
-    }),
-
   update: managerProcedure
     .input(z.object({ id: z.string().uuid() }).merge(updateRouteInputSchema))
     .mutation(({ ctx: { db, session }, input }) => {
@@ -105,6 +90,14 @@ export const routesRouter = createRouter({
     .mutation(({ ctx: { db }, input }) =>
       createController(db)
         .concludeStop(input.routeId, input.stopId)
+        .then(routeWithStopsOutputSchema.parse),
+    ),
+
+  concludeRoute: managerProcedure
+    .input(z.object({ routeId: z.string().uuid() }))
+    .mutation(({ ctx: { db, session }, input }) =>
+      createController(db)
+        .concludeRoute(input.routeId, session.user.id)
         .then(routeWithStopsOutputSchema.parse),
     ),
 

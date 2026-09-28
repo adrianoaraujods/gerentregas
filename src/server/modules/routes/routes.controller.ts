@@ -60,14 +60,6 @@ export class RoutesController {
     return routeWithStopsOutputSchema.parse(result);
   }
 
-  async getDriverRoute(
-    driverId: string,
-    date: Date,
-  ): Promise<DriverRouteOutput | null> {
-    const result = await this.service.getDriverRoute(driverId, date);
-    return result ? driverRouteOutputSchema.parse(result) : null;
-  }
-
   async listRoutes(input: ListRoutesInput): Promise<RoutesListOutput> {
     const result = await this.service.listRoutes(input);
     return routesListOutputSchema.parse(result);
@@ -118,6 +110,14 @@ export class RoutesController {
     stopId: string,
   ): Promise<RouteWithStopsOutput> {
     const result = await this.service.concludeStop(routeId, stopId);
+    return routeWithStopsOutputSchema.parse(result);
+  }
+
+  async concludeRoute(
+    routeId: string,
+    managerId: string,
+  ): Promise<RouteWithStopsOutput> {
+    const result = await this.service.concludeRoute(routeId, managerId);
     return routeWithStopsOutputSchema.parse(result);
   }
 

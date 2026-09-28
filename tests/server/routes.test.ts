@@ -251,31 +251,6 @@ describe("RoutesService", () => {
     });
   });
 
-  describe("getDriverRoute", () => {
-    it("returns only the driver's own day route", async () => {
-      const date = new Date();
-      await routesService.createRoute(
-        {
-          driverId,
-          vehicleId: null,
-          date: date.toISOString(),
-          stops: [{ pointId: pointId1, order: "1" }],
-        },
-        managerId,
-      );
-
-      const result = await routesService.getDriverRoute(driverId, date);
-      expect(result).not.toBeNull();
-      expect(result!.driverId).toBe(driverId);
-      expect(result!.stops.length).toBe(1);
-    });
-
-    it("returns null when driver has no route on that date", async () => {
-      const result = await routesService.getDriverRoute(driverId, new Date());
-      expect(result).toBeNull();
-    });
-  });
-
   describe("updateRoute", () => {
     it("creates new version on structural edit (RNF05)", async () => {
       const route = await routesService.createRoute(
@@ -534,6 +509,83 @@ describe("RoutesService", () => {
       await expect(
         routesService.concludeStop(route.id, route.stops[0].id),
       ).rejects.toThrow(BadRequestError);
+    });
+  });
+
+  describe("concludeRoute", () => {
+    it("concludes an in_flight route early and stamps missing departures", async () => {
+      const route = await routesService.createRoute(
+        {
+          driverId,
+          vehicleId: null,
+          date: new Date().toISOString(),
+          stops: [
+            { pointId: pointId1, order: "1" },
+            { pointId: pointId2, order: "2" },
+            { pointId: pointId3, order: "3" },
+          ],
+        },
+        managerId,
+      );
+      await routesService.startShift(
+        route.id,
+        { vehicleId: vehicleAId },
+        driverId,
+      );
+      await routesService.concludeStop(route.id, route.stops[1].id);
+
+      const controller = new RoutesController(db);
+      const result = await controller.concludeRoute(route.id, managerId);
+
+      expect(result.status).toBe("concluded");
+      expect(result.stops.every((s) => s.departureAt !== null)).toBe(true);
+    });
+
+    it("no-ops on an already concluded route", async () => {
+      const route = await routesService.createRoute(
+        {
+          driverId,
+          vehicleId: null,
+          date: new Date().toISOString(),
+          stops: [
+            { pointId: pointId1, order: "1" },
+            { pointId: pointId2, order: "2" },
+            { pointId: pointId3, order: "3" },
+          ],
+        },
+        managerId,
+      );
+      await routesService.startShift(
+        route.id,
+        { vehicleId: vehicleAId },
+        driverId,
+      );
+
+      const controller = new RoutesController(db);
+      const first = await controller.concludeRoute(route.id, managerId);
+      expect(first.status).toBe("concluded");
+
+      const second = await controller.concludeRoute(route.id, managerId);
+      expect(second.status).toBe("concluded");
+      expect(second.stops.map((s) => s.id).sort()).toEqual(
+        first.stops.map((s) => s.id).sort(),
+      );
+    });
+
+    it("rejects concluding a draft route", async () => {
+      const route = await routesService.createRoute(
+        {
+          driverId,
+          vehicleId: null,
+          date: new Date().toISOString(),
+          stops: [{ pointId: pointId1, order: "1" }],
+        },
+        managerId,
+      );
+
+      await expect(
+        routesService.concludeRoute(route.id, managerId),
+      ).rejects.toThrow("Somente rotas em andamento");
     });
   });
 
@@ -1000,6 +1052,26 @@ describe("RoutesService", () => {
 
         expect(stop.departureAt).not.toBeNull();
         expect(dwellSeconds).toBeGreaterThanOrEqual(0);
+      });
+
+      it("concludes the route on the last stop checkOut (RN: all stops departed)", async () => {
+        await routesService.checkIn(stop2Id, driverId);
+        await routesService.checkOut(stop2Id, driverId);
+
+        let route = await routesService.getDriverRouteWithDwell(
+          driverId,
+          new Date(),
+        );
+        expect(route!.status).toBe("in_flight");
+
+        await routesService.checkIn(stop3Id, driverId);
+        await routesService.checkOut(stop3Id, driverId);
+
+        route = await routesService.getDriverRouteWithDwell(
+          driverId,
+          new Date(),
+        );
+        expect(route!.status).toBe("concluded");
       });
 
       it("rejects checkOut without checkIn", async () => {

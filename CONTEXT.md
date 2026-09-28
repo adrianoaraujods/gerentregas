@@ -36,8 +36,8 @@ _Avoid_: Admin, owner, supervisor
 The duration a vehicle remains stationary at a stop, calculated as departure time minus arrival time. The first stop (Origin) is excluded. Sum of all dwell times across a route equals the route's total dwell time.
 _Avoid_: Idle time, stopped time, tempo parado
 
-**Completion** (Conclusão / status derivado):
-A stop is *concluded* when it has a departure timestamp (`departure_at IS NOT NULL`); a route is concluded when every stop has one. Completion is derived, never stored — there is no separate "concluded" column. `arrival_at`/`departure_at` are the single source of truth for both dwell time and completion.
+**Completion** (Conclusão / status do ciclo de vida):
+A stop is *concluded* when it has a departure timestamp (`departure_at IS NOT NULL`); a route is concluded when every stop has one. `arrival_at`/`departure_at` are the single source of truth for both dwell time and completion; the stored `route.status` (`in_flight` → `concluded`) is the route lifecycle state, set automatically on the last departure or manually by a manager finishing early.
 _Avoid_: concluded_at, finished flag, flag de conclusão
 
 **Standard workday** (Jornada padrão):

@@ -22,7 +22,6 @@ import type {
   AddStopInput,
   CorrectTimestampsInput,
   CreateRouteInput,
-  DriverRouteOutput,
   Route,
   RouteHistoryOutput,
   RouteStatus,
@@ -191,20 +190,6 @@ export class RoutesService {
       stops: stopsWithDwell,
       totalDwellSeconds,
     });
-  }
-
-  async getDriverRoute(
-    driverId: string,
-    date: Date,
-  ): Promise<DriverRouteOutput | null> {
-    const routeData = await this.repository.findRouteByDriverAndDate(
-      driverId,
-      date,
-    );
-    if (!routeData) return null;
-    const result = await this.repository.findRouteWithStops(routeData.id);
-    if (!result) return null;
-    return this.addPricing(result);
   }
 
   async listRoutes(input: {
@@ -493,11 +478,53 @@ export class RoutesService {
 
     await this.repository.updateStopDeparture(stopId, new Date());
 
-    const allStops = await this.repository.listStopsByRoute(routeId);
-    const allConcluded = allStops.every((s) => s.departureAt);
-    if (allConcluded) {
-      await this.repository.updateRoute(routeId, { status: "concluded" });
+    await this.concludeRouteWhenAllStopsDeparted(routeId);
+
+    const result = await this.repository.findRouteWithStops(routeId);
+    if (!result) {
+      throw new BadRequestError("Falha ao buscar rota atualizada.");
     }
+    return this.addPricing(result);
+  }
+
+  async concludeRoute(
+    routeId: string,
+    managerId: string,
+  ): Promise<RouteWithStopsOutput> {
+    const existingRoute = await this.repository.findRouteById(routeId);
+    if (!existingRoute) {
+      throw new NotFoundError("Rota não encontrada.");
+    }
+
+    if (existingRoute.status === "concluded") {
+      const result = await this.repository.findRouteWithStops(routeId);
+      if (!result) {
+        throw new BadRequestError("Falha ao buscar rota atualizada.");
+      }
+      return this.addPricing(result);
+    }
+
+    if (existingRoute.status !== "in_flight") {
+      throw new BadRequestError(
+        "Somente rotas em andamento podem ser concluídas.",
+      );
+    }
+
+    const now = new Date();
+    const allStops = await this.repository.listStopsByRoute(routeId);
+    for (const currentStop of allStops) {
+      if (!currentStop.departureAt) {
+        await this.repository.updateStopDeparture(currentStop.id, now);
+      }
+    }
+
+    await this.repository.updateRoute(routeId, { status: "concluded" });
+
+    const updatedRoute = await this.repository.findRouteById(routeId);
+    if (!updatedRoute) {
+      throw new BadRequestError("Falha ao buscar rota atualizada.");
+    }
+    await this.createNewVersion(routeId, managerId, updatedRoute);
 
     const result = await this.repository.findRouteWithStops(routeId);
     if (!result) {
@@ -842,11 +869,23 @@ export class RoutesService {
       throw new BadRequestError("Falha ao realizar check-out.");
     }
 
+    await this.concludeRouteWhenAllStopsDeparted(stop.routeId);
+
     const dwellSeconds = Math.floor(
       (now.getTime() - new Date(stop.arrivalAt).getTime()) / 1000,
     );
 
     return { stop: updatedStop, dwellSeconds };
+  }
+
+  private async concludeRouteWhenAllStopsDeparted(
+    routeId: string,
+  ): Promise<void> {
+    const allStops = await this.repository.listStopsByRoute(routeId);
+    const allConcluded = allStops.every((s) => s.departureAt);
+    if (allConcluded) {
+      await this.repository.updateRoute(routeId, { status: "concluded" });
+    }
   }
 
   private async recomputeRouteDistance(routeId: string): Promise<void> {

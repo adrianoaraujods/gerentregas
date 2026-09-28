@@ -1,7 +1,7 @@
 "use client";
 
 import { format } from "date-fns";
-import { History, MapIcon, Plus, Trash } from "lucide-react";
+import { CheckCircle2, History, MapIcon, Plus, Trash } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import {
@@ -62,6 +62,9 @@ export function RoteirosContent() {
   const [routeHistoryId, setRouteHistoryId] = useState<string | null>(null);
 
   const [routeToDelete, setRouteToDelete] = useState<ClientRoute | null>(null);
+  const [routeToConclude, setRouteToConclude] = useState<ClientRoute | null>(
+    null,
+  );
 
   const { data: routesData, isLoading: isLoadingRoutes } =
     api.routes.list.useQuery({ limit: 1000, offset: 0 });
@@ -73,6 +76,17 @@ export function RoteirosContent() {
   const { data: vehiclesData } = api.fleet.list.useQuery();
 
   const utils = api.useUtils();
+
+  const concludeMutation = api.routes.concludeRoute.useMutation({
+    onSuccess: () => {
+      toast.success("Roteiro concluído com sucesso!");
+      utils.routes.list.invalidate();
+      setRouteToConclude(null);
+    },
+    onError: (error) => {
+      toast.error(`Erro ao concluir roteiro: ${formatTrpcErrorMessage(error)}`);
+    },
+  });
 
   const deleteMutation = api.routes.delete.useMutation({
     onSuccess: () => {
@@ -174,6 +188,14 @@ export function RoteirosContent() {
                 setIsDialogOpen(true);
               }}
             />
+            {row.original.status === "in_flight" && (
+              <RowActionsItem
+                icon={CheckCircle2}
+                label="Concluir roteiro"
+                disabled={concludeMutation.isPending}
+                onClick={() => setRouteToConclude(row.original)}
+              />
+            )}
             <RowActionsItem
               icon={Trash}
               label="Excluir roteiro"
@@ -246,6 +268,39 @@ export function RoteirosContent() {
         onOpenChange={setIsHistoryDialogOpen}
         routeId={routeHistoryId}
       />
+
+      <AlertDialog
+        open={routeToConclude !== null}
+        onOpenChange={(open) => {
+          if (!open) setRouteToConclude(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Concluir roteiro?</AlertDialogTitle>
+            <AlertDialogDescription>
+              As paradas sem registro de saída serão marcadas como concluídas
+              agora e o roteiro será finalizado. Esta ação não pode ser
+              desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={concludeMutation.isPending}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              disabled={concludeMutation.isPending}
+              onClick={() => {
+                if (routeToConclude) {
+                  concludeMutation.mutate({ routeId: routeToConclude.id });
+                }
+              }}
+            >
+              {concludeMutation.isPending ? "Concluindo..." : "Concluir"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog
         open={routeToDelete !== null}
