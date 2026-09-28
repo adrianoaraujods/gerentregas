@@ -111,8 +111,8 @@ export function PeriodHistoryContent({
         <Card>
           <CardContent className="pt-6">
             <div className="space-y-3">
-              {Array.from({ length: 8 }).map((_, i) => (
-                <Skeleton key={i} className="h-8 w-full" />
+              {[1, 2, 3, 4, 5, 6, 7, 8].map((val) => (
+                <Skeleton key={`skeleton-item-${val}`} className="h-8 w-full" />
               ))}
             </div>
           </CardContent>
@@ -203,7 +203,7 @@ export function PeriodHistoryContent({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">

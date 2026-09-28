@@ -51,13 +51,15 @@ export function MonthBarChart({
   showWorkdayLine = true,
   workdayMinutes = 480,
 }: BarChartProps) {
+  const isMobile = useIsMobile();
+
   if (!data || data.length === 0) {
     return (
       <div className="flex items-center justify-center h-64 text-muted-foreground">
         <p>Nenhum dado para o período selecionado.</p>
+      </div>
+    );
   }
-
-  const isMobile = useIsMobile();
 
   const chartData = data.map((d, index) => {
     const dwellHoursNum = Number((d.totalDwellMinutes / 60).toFixed(2));
@@ -132,60 +134,60 @@ export function MonthBarChart({
             data={chartData}
             margin={{ top: 20, right: 20, bottom: 40, left: isMobile ? 0 : 80 }}
           >
-          <CartesianGrid
-            horizontal
-            strokeDasharray="4 4"
-            stroke="var(--border)"
-            vertical={false}
-          />
-          <XAxis
-            type="number"
-            domain={[0, "dataMax + 1"]}
-            tickFormatter={(value) => `${value}h`}
-            tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
-            axisLine={{ stroke: "var(--border)" }}
-            tickLine={{ stroke: "var(--border)" }}
-          />
-          <YAxis
-            type="category"
-            dataKey="label"
-            width={isMobile ? 50 : 80}
-            tick={{ fontSize: 11 }}
-            axisLine={false}
-            tickLine={false}
-            tickMargin={10}
-          />
-          <Tooltip content={CustomTooltipWrapper} />
-          {showWorkdayLine && workdayMinutes > 0 && (
-            <ReferenceLine
-              x={workdayHours}
-              stroke="var(--destructive)"
+            <CartesianGrid
+              horizontal
               strokeDasharray="4 4"
-              strokeWidth={1.5}
-              label={{
-                value: `Jornada padrão (${workdayHours}h)`,
-                position: "insideStart",
-                fill: "var(--destructive)",
-                fontSize: 10,
-              }}
+              stroke="var(--border)"
+              vertical={false}
             />
-          )}
-          <BarWrapper
-            dataKey="dwellHoursNum"
-            name="Horas Parado"
-            radius={[0, 4, 4, 0]}
-            minPointSize={0}
-            onClick={handleBarClick}
-          >
-            {chartData.map((day) => (
-              <Cell
-                key={day.date}
-                fill={`var(--chart-${(chartData.indexOf(day) % 5) + 1})`}
+            <XAxis
+              type="number"
+              domain={[0, "dataMax + 1"]}
+              tickFormatter={(value) => `${value}h`}
+              tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+              axisLine={{ stroke: "var(--border)" }}
+              tickLine={{ stroke: "var(--border)" }}
+            />
+            <YAxis
+              type="category"
+              dataKey="label"
+              width={isMobile ? 50 : 80}
+              tick={{ fontSize: 11 }}
+              axisLine={false}
+              tickLine={false}
+              tickMargin={10}
+            />
+            <Tooltip content={CustomTooltipWrapper} />
+            {showWorkdayLine && workdayMinutes > 0 && (
+              <ReferenceLine
+                x={workdayHours}
+                stroke="var(--destructive)"
+                strokeDasharray="4 4"
+                strokeWidth={1.5}
+                label={{
+                  value: `Jornada padrão (${workdayHours}h)`,
+                  position: "insideStart",
+                  fill: "var(--destructive)",
+                  fontSize: 10,
+                }}
               />
-            ))}
-          </BarWrapper>
-        </BarChart>
-      </ResponsiveContainer>
+            )}
+            <BarWrapper
+              dataKey="dwellHoursNum"
+              name="Horas Parado"
+              radius={[0, 4, 4, 0]}
+              minPointSize={0}
+              onClick={handleBarClick}
+            >
+              {chartData.map((day) => (
+                <Cell
+                  key={day.date}
+                  fill={`var(--chart-${(chartData.indexOf(day) % 5) + 1})`}
+                />
+              ))}
+            </BarWrapper>
+          </BarChart>
+        </ResponsiveContainer>
       </div>
 
       <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
