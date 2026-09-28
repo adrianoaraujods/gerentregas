@@ -201,14 +201,16 @@ export async function main() {
       name: "Gerente Demo",
       email: MANAGER_EMAIL,
       password: _MANAGER_PASSWORD,
-      role: "manager",
     },
   });
   if (!managerAuth.user) throw new Error("Failed to create manager");
   const managerId = managerAuth.user.id;
   await db
     .update(user)
-    .set({ document: encrypt("12345678901") })
+    .set({ 
+      document: encrypt("12345678901"),
+      role: "manager" 
+    })
     .where(sql`${user.id} = ${managerId}`);
   console.log(`   Manager created: ${MANAGER_EMAIL} (${managerId})`);
 
@@ -220,7 +222,6 @@ export async function main() {
         name: driver.name,
         email: driver.email,
         password: "demo123456",
-        role: "driver",
       },
     });
     if (!driverAuth.user) throw new Error(`Failed to create driver ${driver.email}`);
@@ -233,6 +234,7 @@ export async function main() {
         document: encrypt(
           Math.floor(Math.random() * 90000000000 + 10000000000).toString(),
         ),
+        role: "driver"
       })
       .where(sql`${user.id} = ${id}`);
     
