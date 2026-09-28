@@ -26,7 +26,6 @@ const monoFontFamily = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: "Gerentregas",
-  manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
@@ -47,6 +46,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       )}
       suppressHydrationWarning // because of `next-themes`
     >
+      <head>
+        <link rel="manifest" href="/manifest.webmanifest" crossOrigin="use-credentials" />
+      </head>
       <body className="min-h-svh flex flex-col text-foreground bg-background">
         <Providers>{children}</Providers>
         <ServiceWorkerRegistrar />
