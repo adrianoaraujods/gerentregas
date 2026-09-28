@@ -14,9 +14,9 @@ export const getAggregationInputSchema = z.object({
 export type GetAggregationInput = z.infer<typeof getAggregationInputSchema>;
 
 export const dayTimelineStopSchema = z.object({
-  stopId: z.string().uuid(),
+  stopId: z.string(),
   order: z.string(),
-  pointId: z.string().uuid(),
+  pointId: z.string(),
   pointName: z.string(),
   address: z.string(),
   arrivalTime: z.iso.datetime({ local: true }).nullable(),
@@ -92,12 +92,12 @@ export const drilldownInputSchema = z.object({
 export type DrilldownInput = z.infer<typeof drilldownInputSchema>;
 
 export const drilldownStopSchema = z.object({
-  routeId: z.string().uuid(),
-  driverId: z.string().uuid(),
+  routeId: z.string(),
+  driverId: z.string(),
   driverName: z.string(),
-  stopId: z.string().uuid(),
+  stopId: z.string(),
   order: z.string(),
-  pointId: z.string().uuid(),
+  pointId: z.string(),
   pointName: z.string(),
   address: z.string(),
   arrivalTime: z.iso.datetime({ local: true }).nullable(),
