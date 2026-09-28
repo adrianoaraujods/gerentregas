@@ -5,15 +5,15 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --radius: 0.625rem;
+  --radius: 1rem;
 
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.141 0.005 285.823);
 
-  --popover: oklch(1 0 0);
+  --popover: oklch(1 0 0 / 80%);
   --popover-foreground: oklch(0.141 0.005 285.823);
 
-  --primary: oklch(0.62 0.23 35);
+  --primary: oklch(0.55 0.15 240);
   --primary-foreground: oklch(0.98 0 0);
 
   --secondary: oklch(0.96 0.01 200);
@@ -22,37 +22,37 @@
   --muted: oklch(0.96 0.01 250);
   --muted-foreground: oklch(0.5 0.02 250);
 
-  --accent: oklch(0.7 0.16 200);
-  --accent-foreground: oklch(0.98 0 0);
+  --accent: oklch(0.94 0.02 240);
+  --accent-foreground: oklch(0.55 0.15 240);
 
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(100% 0 0);
 
   --border: oklch(0.92 0.004 286.32);
   --input: oklch(0.92 0.004 286.32);
-  --ring: oklch(0.705 0.015 286.067);
+  --ring: oklch(0.55 0.15 240);
 
-  --chart-1: oklch(0.62 0.23 35);
-  --chart-2: oklch(0.7 0.16 200);
+  --chart-1: oklch(0.55 0.15 240);
+  --chart-2: oklch(0.65 0.1 220);
   --chart-3: oklch(0.65 0.2 60);
   --chart-4: oklch(0.8 0.1 220);
   --chart-5: oklch(0.7 0.1 100);
 
-  --sidebar: oklch(0.985 0 0);
+  --sidebar: oklch(1 0 0 / 80%);
   --sidebar-foreground: oklch(0.141 0.005 285.823);
 
-  --sidebar-primary: oklch(0.646 0.222 41.116);
-  --sidebar-primary-foreground: oklch(0.98 0.016 73.684);
+  --sidebar-primary: oklch(0.55 0.15 240);
+  --sidebar-primary-foreground: oklch(0.98 0 0);
 
-  --sidebar-accent: oklch(0.967 0.001 286.375);
-  --sidebar-accent-foreground: oklch(0.21 0.006 285.885);
+  --sidebar-accent: oklch(0.94 0.02 240);
+  --sidebar-accent-foreground: oklch(0.55 0.15 240);
 
-  --sidebar-border: oklch(0.92 0.004 286.32);
-  --sidebar-ring: oklch(0.705 0.015 286.067);
+  --sidebar-border: oklch(0.92 0.004 286.32 / 0%);
+  --sidebar-ring: oklch(0.55 0.15 240);
 
-  --navbar-height: 56px;
+  --navbar-height: 64px;
 
-  --background: oklch(1 0 0);
+  --background: oklch(0.97 0.005 250);
 
   --foreground: oklch(0.141 0.005 285.823);
 }
@@ -214,7 +214,25 @@
   }
 }
 
-/* Custom Leaflet Dark Mode using standard OSM tiles */
+/* Custom Leaflet Light Mode (Gelo/Cinza) using standard OSM tiles */
+.map-tiles-light {
+  filter: grayscale(100%) opacity(40%) contrast(120%);
+}
+
 .map-tiles-dark {
   filter: invert(1) hue-rotate(180deg) brightness(85%) contrast(90%) grayscale(20%);
+}
+
+/* Neumorphic Shadows */
+.neu-shadow {
+  box-shadow: 10px 10px 30px rgba(174, 174, 192, 0.4), -10px -10px 30px #ffffff;
+}
+.neu-inset {
+  box-shadow: inset 5px 5px 15px rgba(174, 174, 192, 0.4), inset -5px -5px 15px #ffffff;
+}
+.dark .neu-shadow {
+  box-shadow: 10px 10px 30px rgba(0, 0, 0, 0.5), -10px -10px 30px rgba(255, 255, 255, 0.05);
+}
+.dark .neu-inset {
+  box-shadow: inset 5px 5px 15px rgba(0, 0, 0, 0.5), inset -5px -5px 15px rgba(255, 255, 255, 0.05);
 }

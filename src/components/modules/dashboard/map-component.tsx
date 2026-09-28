@@ -12,7 +12,15 @@ const iconUrl = "https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png";
 const shadowUrl =
   "https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png";
 
+import { useTheme } from "next-themes";
+
 export function MapComponent() {
+  const { theme, systemTheme } = useTheme();
+  
+  // Determine if we should use dark or light tiles
+  const isDark = theme === "dark" || (theme === "system" && systemTheme === "dark");
+  const tileClass = isDark ? "map-tiles-dark" : "map-tiles-light";
+
   useEffect(() => {
     // biome-ignore lint/suspicious/noExplicitAny: Leaflet internals
     delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -24,25 +32,25 @@ export function MapComponent() {
   }, []);
 
   return (
-    <div className="absolute inset-0 z-0 bg-zinc-950">
+    <div className="absolute inset-0 z-0 bg-background">
       <MapContainer
         center={[-19.916681, -43.934493]} // Belo Horizonte as default
         zoom={12}
-        className="h-full w-full opacity-70 mix-blend-screen"
+        className="h-full w-full opacity-80"
         zoomControl={false}
       >
-        {/* Standard OSM with CSS inversion for dark mode (no API key required) */}
+        {/* Standard OSM with CSS inversion/filters for theme support */}
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          className="map-tiles-dark"
+          className={tileClass}
         />
         <ZoomControl position="bottomright" />
       </MapContainer>
       
       {/* Overlay gradient to blend the map edges if needed */}
-      <div className="absolute inset-x-0 bottom-0 h-32 z-10 pointer-events-none bg-gradient-to-t from-background to-transparent opacity-80" />
-      <div className="absolute inset-x-0 top-0 h-24 z-10 pointer-events-none bg-gradient-to-b from-background to-transparent opacity-80" />
+      <div className="absolute inset-x-0 bottom-0 h-32 z-10 pointer-events-none bg-gradient-to-t from-background to-transparent opacity-90" />
+      <div className="absolute inset-x-0 top-0 h-24 z-10 pointer-events-none bg-gradient-to-b from-background to-transparent opacity-90" />
     </div>
   );
 }
