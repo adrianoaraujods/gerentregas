@@ -37,6 +37,7 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api/client";
 import { formatTrpcErrorMessage } from "@/lib/api/format-trpc-error";
+import { stopDwellSeconds } from "@/lib/route-metrics";
 import type { QueuedStopEvent } from "@/lib/sync/sync-client";
 import { useSyncQueue } from "@/lib/sync/use-sync-queue";
 import type { RouterOutputs } from "@/server/api/router";
@@ -383,9 +384,11 @@ export function DriverDayContent({ driverName }: { driverName: string }) {
           const departure = formatTime(queued?.departure ?? stop.departureAt);
           const queuedDwellSeconds =
             stopPending && queued?.arrival && queued?.departure
-              ? (new Date(queued.departure).getTime() -
-                  new Date(queued.arrival).getTime()) /
-                1000
+              ? stopDwellSeconds({
+                  order: stop.order,
+                  arrivalAt: queued.arrival,
+                  departureAt: queued.departure,
+                })
               : undefined;
           const dwell = origin
             ? null

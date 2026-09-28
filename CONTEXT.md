@@ -44,6 +44,10 @@ _Avoid_: concluded_at, finished flag, flag de conclusão
 8 hours per day. Used as the denominator for dwell time percentage indicators.
 _Avoid_: shift, work period
 
+**Route metrics** (Métricas do roteiro):
+The dwell-derived quantities of a Route — per-stop dwell time (Origin excluded), route total dwell, and dwell percentage of the standard workday — computed by one shared module (`src/lib/route-metrics`). The dashboard's month views keep a SQL aggregation, pinned equivalent by test. Route cost keeps its own home in the Route module.
+_Avoid_: dwell engine, statistics service
+
 **Parameter** (Parâmetro):
 Configurable system value: fuel price per liter and standard workday duration. Fuel consumption is a Vehicle attribute; cost per kilometer is derived (`fuel_price / vehicle.km_per_liter`). Alterable via UI without code changes.
 _Avoid_: config, setting

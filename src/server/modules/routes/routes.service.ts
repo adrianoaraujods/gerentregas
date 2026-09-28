@@ -1,4 +1,8 @@
 import {
+  stopDwellSeconds,
+  totalDwellSeconds as sumDwellSeconds,
+} from "@/lib/route-metrics";
+import {
   BadRequestError,
   ConflictError,
   ForbiddenError,
@@ -6,7 +10,6 @@ import {
 } from "@/server/api";
 import type { FleetRepository } from "@/server/modules/fleet";
 import type { ParametersRepository } from "@/server/modules/parameters";
-
 import {
   costCentsToBRL,
   hundredthsToKm,
@@ -176,21 +179,12 @@ export class RoutesService {
       throw new NotFoundError("Rota não encontrada.");
     }
 
-    const stopsWithDwell = routeData.stops.map((stop) => {
-      let dwellSeconds: number | undefined;
-      if (stop.arrivalAt && stop.departureAt && stop.order !== "1") {
-        dwellSeconds = Math.floor(
-          (new Date(stop.departureAt).getTime() -
-            new Date(stop.arrivalAt).getTime()) /
-            1000,
-        );
-      }
-      return { ...stop, dwellSeconds };
-    });
+    const stopsWithDwell = routeData.stops.map((stop) => ({
+      ...stop,
+      dwellSeconds: stopDwellSeconds(stop),
+    }));
 
-    const totalDwellSeconds = stopsWithDwell
-      .filter((s) => s.order !== "1" && s.dwellSeconds !== undefined)
-      .reduce((sum, s) => sum + (s.dwellSeconds ?? 0), 0);
+    const totalDwellSeconds = sumDwellSeconds(stopsWithDwell);
 
     return this.addPricing({
       ...routeData,
@@ -681,21 +675,12 @@ export class RoutesService {
     );
     if (!routeWithStops) return null;
 
-    const stopsWithDwell = routeWithStops.stops.map((stop) => {
-      let dwellSeconds: number | undefined;
-      if (stop.arrivalAt && stop.departureAt && stop.order !== "1") {
-        dwellSeconds = Math.floor(
-          (new Date(stop.departureAt).getTime() -
-            new Date(stop.arrivalAt).getTime()) /
-            1000,
-        );
-      }
-      return { ...stop, dwellSeconds };
-    });
+    const stopsWithDwell = routeWithStops.stops.map((stop) => ({
+      ...stop,
+      dwellSeconds: stopDwellSeconds(stop),
+    }));
 
-    const totalDwellSeconds = stopsWithDwell
-      .filter((s) => s.order !== "1" && s.dwellSeconds !== undefined)
-      .reduce((sum, s) => sum + (s.dwellSeconds ?? 0), 0);
+    const totalDwellSeconds = sumDwellSeconds(stopsWithDwell);
 
     return {
       ...routeWithStops,

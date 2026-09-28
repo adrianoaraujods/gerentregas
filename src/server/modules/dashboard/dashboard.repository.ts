@@ -1,4 +1,5 @@
 import { and, eq, isNull, sql } from "drizzle-orm";
+import { stopDwellSeconds, workdayPercentage } from "@/lib/route-metrics";
 import type { Database } from "@/server/db";
 import { user } from "@/server/db/schemas/auth";
 import { parameter } from "@/server/db/schemas/parameters";
@@ -12,18 +13,13 @@ export class DashboardRepository {
     return 8 * 60;
   }
 
-  private computeDwellMinutes(
-    arrivalAt: Date | null,
-    departureAt: Date | null,
-  ): number {
-    if (
-      !arrivalAt ||
-      !departureAt ||
-      departureAt.getTime() <= arrivalAt.getTime()
-    ) {
-      return 0;
-    }
-    return Math.round((departureAt.getTime() - arrivalAt.getTime()) / 60000);
+  private computeDwellMinutes(stop: {
+    order: string;
+    arrivalAt: Date | null;
+    departureAt: Date | null;
+  }): number {
+    const seconds = stopDwellSeconds(stop) ?? 0;
+    return seconds <= 0 ? 0 : Math.round(seconds / 60);
   }
 
   async getStandardWorkdayDuration(): Promise<number> {
@@ -116,10 +112,7 @@ export class DashboardRepository {
         const arrivalTime = currentStop.arrivalAt;
         const departureTime = currentStop.departureAt;
 
-        const dwellMinutes =
-          currentStop.order === "1"
-            ? 0
-            : this.computeDwellMinutes(arrivalTime, departureTime);
+        const dwellMinutes = this.computeDwellMinutes(currentStop);
         totalDwellMinutes += dwellMinutes;
 
         const startHour = arrivalTime
@@ -372,10 +365,7 @@ export class DashboardRepository {
       for (const currentStop of routeStops) {
         const arrivalTime = currentStop.arrivalAt;
         const departureTime = currentStop.departureAt;
-        const dwellMinutes = this.computeDwellMinutes(
-          arrivalTime,
-          departureTime,
-        );
+        const dwellMinutes = this.computeDwellMinutes(currentStop);
         totalDwellMinutes += dwellMinutes;
 
         result.push({
@@ -433,10 +423,10 @@ export class DashboardRepository {
       const departureStr = s.departureTime
         ? s.departureTime.toISOString().replace("T", " ").substring(0, 19)
         : "";
-      const workdayPct =
-        workdayMinutes > 0
-          ? ((s.dwellMinutes / workdayMinutes) * 100).toFixed(2)
-          : "0.00";
+      const workdayPct = workdayPercentage(
+        s.dwellMinutes,
+        workdayMinutes,
+      ).toFixed(2);
 
       return [
         dateStr,

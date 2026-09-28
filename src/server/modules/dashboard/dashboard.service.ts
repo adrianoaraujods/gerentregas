@@ -1,3 +1,4 @@
+import { workdayPercentage as computeWorkdayPercentage } from "@/lib/route-metrics";
 import { NotFoundError } from "@/server/api";
 import type { DashboardRepository } from "./dashboard.repository";
 import type {
@@ -36,12 +37,16 @@ export class DashboardService {
         ...s,
         arrivalTime: s.arrivalTime?.toISOString() ?? null,
         departureTime: s.departureTime?.toISOString() ?? null,
-        workdayPercentage:
-          workdayMinutes > 0 ? (s.dwellMinutes / workdayMinutes) * 100 : 0,
+        workdayPercentage: computeWorkdayPercentage(
+          s.dwellMinutes,
+          workdayMinutes,
+        ),
       }));
 
-      const workdayPercentage =
-        workdayMinutes > 0 ? (totalDwellMinutes / workdayMinutes) * 100 : 0;
+      const workdayPercentage = computeWorkdayPercentage(
+        totalDwellMinutes,
+        workdayMinutes,
+      );
 
       return {
         periodType: "day",
@@ -65,12 +70,16 @@ export class DashboardService {
         date: d.date.toISOString(),
         totalDwellMinutes: d.totalDwellMinutes,
         stopsCount: d.stopsCount,
-        workdayPercentage:
-          workdayMinutes > 0 ? (d.totalDwellMinutes / workdayMinutes) * 100 : 0,
+        workdayPercentage: computeWorkdayPercentage(
+          d.totalDwellMinutes,
+          workdayMinutes,
+        ),
       }));
 
-      const workdayPercentage =
-        workdayMinutes > 0 ? (totalDwellMinutes / workdayMinutes) * 100 : 0;
+      const workdayPercentage = computeWorkdayPercentage(
+        totalDwellMinutes,
+        workdayMinutes,
+      );
 
       return {
         periodType: "month",
@@ -97,12 +106,16 @@ export class DashboardService {
         date: d.date.toISOString(),
         totalDwellMinutes: d.totalDwellMinutes,
         stopsCount: d.stopsCount,
-        workdayPercentage:
-          workdayMinutes > 0 ? (d.totalDwellMinutes / workdayMinutes) * 100 : 0,
+        workdayPercentage: computeWorkdayPercentage(
+          d.totalDwellMinutes,
+          workdayMinutes,
+        ),
       }));
 
-      const workdayPercentage =
-        workdayMinutes > 0 ? (totalDwellMinutes / workdayMinutes) * 100 : 0;
+      const workdayPercentage = computeWorkdayPercentage(
+        totalDwellMinutes,
+        workdayMinutes,
+      );
 
       return {
         periodType: "custom",
@@ -134,12 +147,16 @@ export class DashboardService {
       ...s,
       arrivalTime: s.arrivalTime?.toISOString() ?? null,
       departureTime: s.departureTime?.toISOString() ?? null,
-      workdayPercentage:
-        workdayMinutes > 0 ? (s.dwellMinutes / workdayMinutes) * 100 : 0,
+      workdayPercentage: computeWorkdayPercentage(
+        s.dwellMinutes,
+        workdayMinutes,
+      ),
     }));
 
-    const workdayPercentage =
-      workdayMinutes > 0 ? (totalDwellMinutes / workdayMinutes) * 100 : 0;
+    const workdayPercentage = computeWorkdayPercentage(
+      totalDwellMinutes,
+      workdayMinutes,
+    );
 
     return {
       stops: enrichedStops,

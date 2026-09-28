@@ -27,6 +27,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api/client";
 import { formatTrpcErrorMessage } from "@/lib/api/format-trpc-error";
+import { formatBRL } from "@/lib/formatter";
 import type { RouterOutputs } from "@/server/api/router";
 
 import { RouteDialog } from "./route-dialog";
@@ -45,10 +46,7 @@ const ROUTE_STATUS_OPTIONS = [
 
 function formatCurrency(value: number | null | undefined) {
   if (value == null) return "Indeterminado";
-  return new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-  }).format(value / 100);
+  return formatBRL(value);
 }
 
 function formatDistance(value: number | null | undefined) {
