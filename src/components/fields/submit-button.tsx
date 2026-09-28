@@ -8,7 +8,7 @@ type SubmitButtonProps = Omit<React.ComponentProps<typeof Button>, "type">;
 export function SubmitButton({
   className,
   variant = "default",
-  size = "lg",
+  size = "default",
   disabled,
   children,
   ...props

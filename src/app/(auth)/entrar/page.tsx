@@ -8,7 +8,13 @@ export default function LoginPage() {
       className="flex items-center justify-center py-8 sm:py-16"
       render={
         <main>
-          <Suspense fallback={<div className="flex h-[400px] w-full max-w-md items-center justify-center">Carregando...</div>}>
+          <Suspense
+            fallback={
+              <div className="flex h-[400px] w-full max-w-md items-center justify-center">
+                Carregando...
+              </div>
+            }
+          >
             <LoginForm />
           </Suspense>
         </main>

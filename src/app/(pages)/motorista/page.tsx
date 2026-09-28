@@ -7,7 +7,7 @@ import type { User } from "@/server/modules/auth";
 
 export default async function MotoristaPage() {
   const session = await getSession();
-  
+
   if (!session) {
     redirect("/entrar?callbackUrl=%2Fmotorista");
   }
