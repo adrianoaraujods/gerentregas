@@ -682,11 +682,11 @@ export class RoutesService {
 
     const totalDwellSeconds = sumDwellSeconds(stopsWithDwell);
 
-    return {
+    return this.addPricing({
       ...routeWithStops,
       stops: stopsWithDwell,
       totalDwellSeconds,
-    };
+    });
   }
 
   async startShift(

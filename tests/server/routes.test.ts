@@ -16,6 +16,7 @@ import type { GeocodeResult } from "@/server/modules/points/geocoder";
 import { PointsRepository } from "@/server/modules/points/points.repository";
 import { PointsService } from "@/server/modules/points/points.service";
 import type { OsrmClient } from "@/server/modules/routes/osrm";
+import { RoutesController } from "@/server/modules/routes/routes.controller";
 import { RoutesRepository } from "@/server/modules/routes/routes.repository";
 import { RoutesService } from "@/server/modules/routes/routes.service";
 
@@ -1095,6 +1096,61 @@ describe("RoutesService", () => {
         expect(result!.stops[0].departureAt).not.toBeNull();
         expect(result!.stops[0].arrivalAt).toBeNull();
         expect(result!.stops[0].dwellSeconds).toBeUndefined();
+      });
+
+      it("includes pricing fields on a draft route without vehicle (driver output contract)", async () => {
+        const result = await routesService.getDriverRouteWithDwell(
+          driverId,
+          new Date(),
+        );
+
+        expect(result).not.toBeNull();
+        expect(result).toHaveProperty("distanceKm", 12);
+        expect(result).toHaveProperty("cost", null);
+      });
+
+      it("passes driverRouteOutputSchema via the controller for a draft route (driver sees route)", async () => {
+        const controller = new RoutesController(db);
+
+        const result = await controller.getDriverRouteWithDwell(
+          driverId,
+          new Date(),
+        );
+
+        expect(result).not.toBeNull();
+        expect(result!.id).toBe(routeId);
+        expect(result!.distanceKm).toBe(12);
+        expect(result!.cost).toBeNull();
+      });
+
+      it("passes driverRouteOutputSchema via the controller after shift start", async () => {
+        await routesService.startShift(routeId, { vehicleId }, driverId);
+        const controller = new RoutesController(db);
+
+        const result = await controller.getDriverRouteWithDwell(
+          driverId,
+          new Date(),
+        );
+
+        expect(result).not.toBeNull();
+        expect(result!.status).toBe("in_flight");
+        expect(result!.distanceKm).toBe(12);
+        expect(result!.cost).toBe(7.2);
+      });
+
+      it("passes routeWithStopsOutputSchema via controller.startShift", async () => {
+        const controller = new RoutesController(db);
+
+        const result = await controller.startShift(
+          routeId,
+          { vehicleId },
+          driverId,
+        );
+
+        expect(result.status).toBe("in_flight");
+        expect(result.vehicleId).toBe(vehicleId);
+        expect(result.distanceKm).toBe(12);
+        expect(result.cost).toBe(7.2);
       });
     });
   });
