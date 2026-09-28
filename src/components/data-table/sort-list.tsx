@@ -273,15 +273,15 @@ export function DataTableSortList({
                             </PopoverContent>
                           </Popover>
                           <Select
-                            value={
-                              sort.desc
-                                ? "Ordem decrescente"
-                                : "Ordem crescente"
-                            }
+                            value={sort.desc ? "desc" : "asc"}
                             onValueChange={(value) => {
                               if (!value) return;
                               onSortUpdate(sort.id, { desc: value === "desc" });
                             }}
+                            items={[
+                              { value: "asc", label: "Ordem crescente" },
+                              { value: "desc", label: "Ordem decrescente" },
+                            ]}
                           >
                             <SelectTrigger
                               aria-controls={`${sortItemId}-direction-listbox`}

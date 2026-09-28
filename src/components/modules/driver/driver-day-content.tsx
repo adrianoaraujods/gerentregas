@@ -311,6 +311,10 @@ export function DriverDayContent({ driverName }: { driverName: string }) {
                 <Select
                   value={effectiveVehicleId}
                   onValueChange={(value) => setSelectedVehicleId(value)}
+                  items={vehicleOptions.map((vehicle: VehicleOutput) => ({
+                    value: vehicle.id,
+                    label: vehicleLabel(vehicle),
+                  }))}
                 >
                   <SelectTrigger
                     id="vehicle"
@@ -321,7 +325,11 @@ export function DriverDayContent({ driverName }: { driverName: string }) {
                   </SelectTrigger>
                   <SelectContent>
                     {vehicleOptions.map((vehicle: VehicleOutput) => (
-                      <SelectItem key={vehicle.id} value={vehicle.id}>
+                      <SelectItem
+                        key={vehicle.id}
+                        value={vehicle.id}
+                        label={vehicleLabel(vehicle)}
+                      >
                         {vehicleLabel(vehicle)}
                       </SelectItem>
                     ))}

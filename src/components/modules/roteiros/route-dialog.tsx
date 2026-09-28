@@ -184,15 +184,21 @@ export function RouteDialog({
           <div className="py-8 flex justify-center">Carregando...</div>
         ) : (
           <form onSubmit={handleSubmit} className="flex flex-col gap-6 mt-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-4 sm:grid-cols-2">
               <Field>
                 <FieldLabel htmlFor="driverId">Motorista</FieldLabel>
                 <FieldContent>
                   <Select
                     value={driverId}
                     onValueChange={(val) => setDriverId(val || "")}
+                    items={drivers?.drivers.map(
+                      (d: { id: string; name: string }) => ({
+                        value: d.id,
+                        label: d.name,
+                      }),
+                    )}
                   >
-                    <SelectTrigger id="driverId">
+                    <SelectTrigger id="driverId" className="w-full">
                       <SelectValue placeholder="Selecione..." />
                     </SelectTrigger>
                     <SelectContent>
@@ -228,8 +234,14 @@ export function RouteDialog({
                 <Select
                   value={vehicleId}
                   onValueChange={(val) => setVehicleId(val || "")}
+                  items={vehicles?.map(
+                    (v: { id: string; plate: string; model: string }) => ({
+                      value: v.id,
+                      label: `${v.plate} - ${v.model}`,
+                    }),
+                  )}
                 >
-                  <SelectTrigger id="vehicleId">
+                  <SelectTrigger id="vehicleId" className="w-full">
                     <SelectValue placeholder="Selecione um veículo..." />
                   </SelectTrigger>
                   <SelectContent>
@@ -281,6 +293,16 @@ export function RouteDialog({
                         onValueChange={(val) =>
                           handleUpdateStopUI(index, val || "")
                         }
+                        items={points?.points.map(
+                          (p: {
+                            id: string;
+                            name: string;
+                            address: string;
+                          }) => ({
+                            value: p.id,
+                            label: `${p.name} - ${p.address}`,
+                          }),
+                        )}
                       >
                         <SelectTrigger className="flex-1">
                           <SelectValue placeholder="Selecione um ponto..." />
@@ -372,6 +394,12 @@ export function RouteDialog({
                           });
                         }
                       }}
+                      items={points?.points.map(
+                        (p: { id: string; name: string }) => ({
+                          value: p.id,
+                          label: p.name,
+                        }),
+                      )}
                     >
                       <SelectTrigger className="flex-1">
                         <SelectValue placeholder="Adicionar nova parada ao final..." />

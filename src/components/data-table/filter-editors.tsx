@@ -295,6 +295,7 @@ export function FilterValueEditor({
         <Select
           value={(toEditorValue("boolean", value) as string) ?? ""}
           onValueChange={(raw) => onValueChange(toStoredValue("boolean", raw))}
+          items={booleanOptions}
         >
           <SelectTrigger
             size="sm"
