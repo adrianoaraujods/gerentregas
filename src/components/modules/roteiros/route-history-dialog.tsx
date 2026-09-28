@@ -31,7 +31,7 @@ export function RouteHistoryDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+      <DialogContent size="lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <History className="h-5 w-5" />
@@ -43,7 +43,7 @@ export function RouteHistoryDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6 mt-4">
+        <div className="space-y-6 mt-4 min-h-0 overflow-y-auto">
           {isLoading ? (
             <div className="space-y-4">
               <Skeleton className="h-24 w-full" />
