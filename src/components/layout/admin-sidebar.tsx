@@ -129,7 +129,6 @@ export default function AdminSidebar({ user }: { user: User }) {
           className="flex gap-4 items-center px-2"
           render={<Button variant="ghost" />}
           user={user}
-          side="right"
         >
           <Avatar className="size-8">
             {user.image && <AvatarImage src={user.image} alt={user.name} />}
