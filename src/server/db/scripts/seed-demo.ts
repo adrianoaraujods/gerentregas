@@ -1,6 +1,7 @@
 import "dotenv/config";
 
 import { sql } from "drizzle-orm";
+import { auth } from "@/lib/auth";
 import { db } from "@/server/db";
 import { user } from "@/server/db/schemas/auth";
 import { point } from "@/server/db/schemas/points";
@@ -195,36 +196,46 @@ export async function main() {
   console.log("🧹 Cleared existing demo data");
 
   console.log("👤 Creating manager...");
-  const managerId = crypto.randomUUID();
-  await db.insert(user).values({
-    id: managerId,
-    name: "Gerente Demo",
-    email: MANAGER_EMAIL,
-    emailVerified: true,
-    role: "manager",
-    document: encrypt("12345678901"),
-    createdAt: new Date(),
-    updatedAt: new Date(),
+  const managerAuth = await auth.api.createUser({
+    body: {
+      name: "Gerente Demo",
+      email: MANAGER_EMAIL,
+      password: _MANAGER_PASSWORD,
+      role: "manager",
+    },
   });
+  if (!managerAuth.user) throw new Error("Failed to create manager");
+  const managerId = managerAuth.user.id;
+  await db
+    .update(user)
+    .set({ document: encrypt("12345678901") })
+    .where(sql`${user.id} = ${managerId}`);
   console.log(`   Manager created: ${MANAGER_EMAIL} (${managerId})`);
 
   console.log("🚗 Creating drivers...");
   const driverIds: string[] = [];
   for (const driver of DRIVERS) {
-    const id = crypto.randomUUID();
-    driverIds.push(id);
-    await db.insert(user).values({
-      id,
-      name: driver.name,
-      email: driver.email,
-      emailVerified: true,
-      role: "driver",
-      document: encrypt(
-        Math.floor(Math.random() * 90000000000 + 10000000000).toString(),
-      ),
-      createdAt: new Date(),
-      updatedAt: new Date(),
+    const driverAuth = await auth.api.createUser({
+      body: {
+        name: driver.name,
+        email: driver.email,
+        password: "demo123456",
+        role: "driver",
+      },
     });
+    if (!driverAuth.user) throw new Error(`Failed to create driver ${driver.email}`);
+    const id = driverAuth.user.id;
+    driverIds.push(id);
+    
+    await db
+      .update(user)
+      .set({
+        document: encrypt(
+          Math.floor(Math.random() * 90000000000 + 10000000000).toString(),
+        ),
+      })
+      .where(sql`${user.id} = ${id}`);
+    
     console.log(`   Driver created: ${driver.name} (${id})`);
   }
 
