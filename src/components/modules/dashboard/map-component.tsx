@@ -31,10 +31,11 @@ export function MapComponent() {
         className="h-full w-full opacity-70 mix-blend-screen"
         zoomControl={false}
       >
-        {/* Dark Matter theme from CartoDB */}
+        {/* Standard OSM with CSS inversion for dark mode (no API key required) */}
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          className="map-tiles-dark"
         />
         <ZoomControl position="bottomright" />
       </MapContainer>

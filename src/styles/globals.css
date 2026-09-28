@@ -213,3 +213,8 @@
     cursor: pointer;
   }
 }
+
+/* Custom Leaflet Dark Mode using standard OSM tiles */
+.map-tiles-dark {
+  filter: invert(1) hue-rotate(180deg) brightness(85%) contrast(90%) grayscale(20%);
+}
