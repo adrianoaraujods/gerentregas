@@ -42,7 +42,10 @@ import { api } from "@/lib/api/client";
 import { formatTrpcErrorMessage } from "@/lib/api/format-trpc-error";
 import { toNavigationStopInput } from "@/lib/driver-navigation";
 import { buildNavigationLinks } from "@/lib/navigation-links";
-import { stopDwellSeconds } from "@/lib/route-metrics";
+import {
+  formatDwellSeconds as formatDwell,
+  stopDwellSeconds,
+} from "@/lib/route-metrics";
 import type { QueuedStopEvent } from "@/lib/sync/sync-client";
 import { useSyncQueue } from "@/lib/sync/use-sync-queue";
 import type { RouterOutputs } from "@/server/api/router";
@@ -61,17 +64,6 @@ function formatTime(value: Date | string | null | undefined): string | null {
   const date = toDate(value);
   if (!date) return null;
   return format(date, "HH:mm:ss");
-}
-
-function formatDwell(seconds: number | undefined): string | null {
-  if (seconds === undefined || seconds < 0) return null;
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const secs = seconds % 60;
-  if (hours > 0) return `${hours} h ${minutes} min`;
-  if (minutes > 0)
-    return secs > 0 ? `${minutes} min ${secs} s` : `${minutes} min`;
-  return `${secs} s`;
 }
 
 function vehicleLabel(vehicle: VehicleOutput): string {

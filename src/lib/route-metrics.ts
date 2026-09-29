@@ -32,3 +32,16 @@ export function workdayPercentage(
   if (standardWorkday <= 0) return 0;
   return (dwell / standardWorkday) * 100;
 }
+
+export function formatDwellSeconds(
+  seconds: number | null | undefined,
+): string | null {
+  if (seconds === null || seconds === undefined || seconds < 0) return null;
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+  if (hours > 0) return `${hours} h ${minutes} min`;
+  if (minutes > 0)
+    return secs > 0 ? `${minutes} min ${secs} s` : `${minutes} min`;
+  return `${secs} s`;
+}

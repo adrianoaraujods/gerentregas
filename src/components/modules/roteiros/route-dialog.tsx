@@ -24,6 +24,8 @@ import {
 import { api } from "@/lib/api/client";
 import { formatTrpcErrorMessage } from "@/lib/api/format-trpc-error";
 
+import { RouteMap } from "./route-map";
+
 interface RouteDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -176,7 +178,7 @@ export function RouteDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-h-[90vh] overflow-y-auto" size="3xl">
         <DialogHeader>
           <DialogTitle>
             {isEditing ? "Editar Roteiro" : "Novo Roteiro"}
@@ -266,6 +268,14 @@ export function RouteDialog({
                 </Select>
               </FieldContent>
             </Field>
+
+            {isEditing && routeData && (
+              <RouteMap
+                stops={routeData.stops}
+                geometry={routeData.geometry ?? null}
+                status={routeData.status}
+              />
+            )}
 
             <div className="space-y-4">
               <div className="flex items-center justify-between">
