@@ -21,174 +21,286 @@ Atores, casos de uso e associações conforme as procedures tRPC implementadas
 (`auth`, `drivers`, `fleet`, `points`, `routes`, `dashboard`, `parameters`, `sync`) e as
 telas correspondentes. A especialização representa o fato de que, no código, o perfil
 `admin` atende a todas as procedures de `manager` (`roleMiddleware(["manager", "admin"])`).
-
 ```mermaid
-flowchart TB
-  subgraph ATORES["Atores"]
-    direction LR
-    A1(("Usuário<br/>não autenticado"))
-    A2(("Motorista /<br/>Motoboy"))
-    A3(("Gerente /<br/>Coordenador"))
-    A4(("Administrador"))
-  end
+flowchart LR
 
-  subgraph CONTA["Conta e acesso"]
+  %% =========================
+  %% ATORES
+  %% =========================
+
+  A1["<div style='text-align:center'><pre>  o
+ /|\
+ / \</pre><b>Usuário<br/>não autenticado</b></div>"]
+
+  A2["<div style='text-align:center'><pre>  o
+ /|\
+ / \</pre><b>Motorista /<br/>Motoboy</b></div>"]
+
+  A3["<div style='text-align:center'><pre>  o
+ /|\
+ / \</pre><b>Gerente /<br/>Coordenador</b></div>"]
+
+  A4["<div style='text-align:center'><pre>  o
+ /|\
+ / \</pre><b>Administrador</b></div>"]
+
+  %% Generalização do Administrador
+  A4 -. "especializa" .-> A3
+
+
+  %% =========================
+  %% FRONTEIRA DO SISTEMA
+  %% =========================
+
+  subgraph SISTEMA["SISTEMA DE GESTÃO DE ROTAS E ENTREGAS"]
     direction TB
-    UC01["RF01 Cadastrar-se"]
-    UC02["RF02 Autenticar-se"]
-    UC03["RF03 Encerrar sessão"]
-    UC04["RF04 Solicitar redefinição de senha"]
-    UC05["RF05 Redefinir senha com token"]
-    UC06["RF06 Consultar o próprio perfil"]
-    UC07["RF07 Ver a conta e alterar o tema"]
+
+    %% -------------------------
+    %% CONTA E ACESSO
+    %% -------------------------
+
+    subgraph CONTA["Conta e acesso"]
+      direction TB
+      UC01(["Cadastrar-se"])
+      UC02(["Autenticar-se"])
+      UC03(["Encerrar sessão"])
+      UC04(["Solicitar redefinição de senha"])
+      UC05(["Redefinir senha com token"])
+      UC06(["Consultar próprio perfil"])
+      UC07(["Alterar tema da conta"])
+    end
+
+
+    %% -------------------------
+    %% USUÁRIOS
+    %% -------------------------
+
+    subgraph USUARIOS["Gestão de usuários"]
+      direction TB
+      UC08(["Cadastrar motorista"])
+      UC09(["Cadastrar gerente"])
+      UC10(["Listar usuários"])
+      UC11(["Consultar usuário"])
+      UC12(["Atualizar dados do usuário"])
+      UC13(["Excluir usuário"])
+      UC14(["Restaurar usuário"])
+    end
+
+
+    %% -------------------------
+    %% FROTA
+    %% -------------------------
+
+    subgraph FROTA["Gestão de veículos"]
+      direction TB
+      UC15(["Cadastrar veículo"])
+      UC16(["Listar veículos"])
+      UC17(["Editar veículo"])
+      UC18(["Excluir veículo"])
+    end
+
+
+    %% -------------------------
+    %% PONTOS
+    %% -------------------------
+
+    subgraph PONTOS["Gestão de pontos do roteiro"]
+      direction TB
+      UC19(["Cadastrar ponto"])
+      UC20(["Consultar ponto"])
+      UC21(["Listar pontos"])
+      UC22(["Editar ponto"])
+      UC23(["Excluir ponto"])
+      UC24(["Restaurar ponto"])
+      UC25(["Geocodificar endereço"])
+    end
+
+
+    %% -------------------------
+    %% ROTEIROS
+    %% -------------------------
+
+    subgraph ROTEIROS["Gestão de roteiros"]
+      direction TB
+      UC26(["Montar roteiro do dia"])
+      UC27(["Calcular distância do roteiro"])
+      UC28(["Listar roteiros"])
+      UC29(["Consultar roteiro"])
+      UC30(["Editar roteiro"])
+      UC31(["Gerar versão do roteiro"])
+      UC32(["Adicionar parada"])
+      UC33(["Editar parada"])
+      UC34(["Concluir parada"])
+      UC35(["Excluir parada"])
+      UC36(["Excluir roteiro"])
+      UC37(["Restaurar roteiro"])
+      UC38(["Consultar histórico de versões"])
+      UC39(["Corrigir horários da parada"])
+    end
+
+
+    %% -------------------------
+    %% OPERAÇÃO
+    %% -------------------------
+
+    subgraph OPERACAO["Execução do roteiro"]
+      direction TB
+      UC40(["Consultar roteiro do dia"])
+      UC41(["Iniciar turno"])
+      UC42(["Escolher veículo"])
+      UC43(["Registrar chegada"])
+      UC44(["Registrar saída"])
+      UC45(["Registrar tempo parado"])
+      UC46(["Registrar chegada e saída offline"])
+      UC47(["Sincronizar registros pendentes"])
+      UC48(["Reprocessar registro rejeitado"])
+      UC49(["Descartar registro rejeitado"])
+    end
+
+
+    %% -------------------------
+    %% INDICADORES
+    %% -------------------------
+
+    subgraph INDICADORES["Dashboard e relatórios"]
+      direction TB
+      UC50(["Consultar dashboard diário"])
+      UC51(["Consultar dashboard mensal"])
+      UC52(["Consultar dashboard por período"])
+      UC53(["Consultar detalhes de um dia"])
+      UC54(["Exportar relatório CSV"])
+      UC55(["Consultar jornada padrão"])
+      UC56(["Consultar parâmetros"])
+      UC57(["Atualizar parâmetros"])
+    end
+
+
+    %% =========================
+    %% RELACIONAMENTOS INCLUDE
+    %% =========================
+
+    UC04 -. "«include»" .-> UC05
+
+    UC19 -. "«include»" .-> UC25
+    UC22 -. "«include»" .-> UC25
+
+    UC26 -. "«include»" .-> UC27
+
+    UC30 -. "«include»" .-> UC31
+
+    UC32 -. "«include»" .-> UC27
+
+    UC41 -. "«include»" .-> UC42
+
+    UC44 -. "«include»" .-> UC45
+
+    UC54 -. "«include»" .-> UC53
+
+
+    %% =========================
+    %% RELACIONAMENTOS EXTEND
+    %% =========================
+
+    UC46 -. "«extend»" .-> UC43
+    UC46 -. "«extend»" .-> UC44
+
+    UC47 -. "«extend»" .-> UC46
+
+    UC48 -. "«extend»" .-> UC47
+    UC49 -. "«extend»" .-> UC47
+
+    UC39 -. "«extend»" .-> UC33
   end
 
-  subgraph USUARIOS["Motoristas e gerentes"]
-    direction TB
-    UC08["RF08 Cadastrar motorista"]
-    UC09["RF09 Cadastrar gerente"]
-    UC10["RF10 Listar e buscar usuários"]
-    UC11["RF11 Consultar usuário"]
-    UC12["RF12 Atualizar dados e CPF"]
-    UC13["RF13 Excluir usuário"]
-    UC14["RF13 Restaurar usuário"]
-  end
 
-  subgraph FROTA["Frota de veículos"]
-    direction TB
-    UC15["RF14 Cadastrar veículo"]
-    UC16["RF15 Listar veículos"]
-    UC17["RF16 Editar veículo"]
-    UC18["RF17 Excluir veículo"]
-  end
+  %% =========================
+  %% ASSOCIAÇÕES DOS ATORES
+  %% =========================
 
-  subgraph PONTOS["Pontos do roteiro"]
-    direction TB
-    UC19["RF18 / RF19 Cadastrar ponto com geocodificação"]
-    UC20["RF20 Consultar ponto"]
-    UC21["RF21 Listar pontos"]
-    UC22["RF22 Editar ponto e re-geocodificar"]
-    UC23["RF23 Excluir ponto"]
-    UC24["RF23 Restaurar ponto"]
-  end
+  %% Usuário não autenticado
+  A1 --- UC01
+  A1 --- UC02
+  A1 --- UC04
+  A1 --- UC05
 
-  subgraph ROTEIROS["Roteiros, paradas e versões"]
-    direction TB
-    UC25["RF24 Montar roteiro do dia"]
-    UC26["RF25 Calcular distância do roteiro"]
-    UC27["RF26 Listar roteiros"]
-    UC28["RF27 Consultar roteiro com paradas e tempo parado"]
-    UC29["RF28 Editar roteiro e gerar versão"]
-    UC30["RF29 Adicionar parada"]
-    UC31["RF30 Editar parada"]
-    UC32["RF31 Concluir parada"]
-    UC33["RF32 Excluir parada"]
-    UC34["RF33 Excluir roteiro"]
-    UC35["RF33 Restaurar roteiro"]
-    UC36["RF34 Consultar histórico de versões"]
-    UC37["RF35 Corrigir horários da parada"]
-  end
 
-  subgraph OPERACAO["Execução do dia pelo motorista"]
-    direction TB
-    UC38["RF36 Consultar roteiro do dia"]
-    UC39["RF37 Iniciar turno e escolher veículo"]
-    UC40["RF38 Registrar chegada"]
-    UC41["RF39 Registrar saída e tempo parado"]
-    UC42["RF40 Registrar chegada e saída offline"]
-    UC43["RF41 Sincronizar lote pendente"]
-    UC44["RF42 Reprocessar ou descartar rejeitado"]
-  end
+  %% Motorista
+  A2 --- UC03
+  A2 --- UC06
+  A2 --- UC07
+  A2 --- UC16
+  A2 --- UC40
+  A2 --- UC41
+  A2 --- UC43
+  A2 --- UC44
+  A2 --- UC46
+  A2 --- UC47
+  A2 --- UC48
+  A2 --- UC49
 
-  subgraph INDICADORES["Dashboard, histórico e parâmetros"]
-    direction TB
-    UC45["RF43 Dashboard por dia"]
-    UC46["RF44 Dashboard por mês"]
-    UC47["RF45 Dashboard por período"]
-    UC48["RF46 Drilldown de um dia"]
-    UC49["RF47 Exportar relatório CSV"]
-    UC50["RF48 Consultar jornada padrão"]
-    UC51["RF49 Consultar parâmetros"]
-    UC52["RF50 Atualizar parâmetros"]
-  end
 
-  A1 --> UC01
-  A1 --> UC02
-  A1 --> UC04
-  A1 --> UC05
-  A1 --> UC07
+  %% Gerente
+  A3 --- UC03
+  A3 --- UC06
+  A3 --- UC07
 
-  A2 --> UC03
-  A2 --> UC06
-  A2 --> UC07
-  A2 --> UC16
-  A2 --> UC38
-  A2 --> UC39
-  A2 --> UC40
-  A2 --> UC41
-  A2 --> UC42
-  A2 --> UC43
-  A2 --> UC44
+  A3 --- UC08
+  A3 --- UC10
+  A3 --- UC11
+  A3 --- UC12
+  A3 --- UC13
 
-  A3 --> UC03
-  A3 --> UC06
-  A3 --> UC08
-  A3 --> UC10
-  A3 --> UC11
-  A3 --> UC12
-  A3 --> UC13
-  A3 --> UC15
-  A3 --> UC16
-  A3 --> UC17
-  A3 --> UC18
-  A3 --> UC19
-  A3 --> UC20
-  A3 --> UC21
-  A3 --> UC22
-  A3 --> UC23
-  A3 --> UC25
-  A3 --> UC27
-  A3 --> UC28
-  A3 --> UC29
-  A3 --> UC30
-  A3 --> UC31
-  A3 --> UC32
-  A3 --> UC33
-  A3 --> UC34
-  A3 --> UC36
-  A3 --> UC37
-  A3 --> UC45
-  A3 --> UC46
-  A3 --> UC47
-  A3 --> UC48
-  A3 --> UC49
-  A3 --> UC50
-  A3 --> UC51
-  A3 --> UC52
+  A3 --- UC15
+  A3 --- UC16
+  A3 --- UC17
+  A3 --- UC18
 
-  A4 --> UC09
-  A4 --> UC10
-  A4 --> UC14
-  A4 --> UC24
-  A4 --> UC35
-  A4 -- "especializa" --> A3
+  A3 --- UC19
+  A3 --- UC20
+  A3 --- UC21
+  A3 --- UC22
+  A3 --- UC23
 
-  UC25 -->|"«include»"| UC26
-  UC30 -->|"«include»"| UC26
-  UC49 -->|"«include»"| UC48
-  UC43 -->|"«extend»"| UC42
-  UC40 -.->|"«extend» (offline)"| UC42
-  UC41 -.->|"«extend» (offline)"| UC42
-  UC44 -->|"«extend»"| UC43
-  UC31 -->|"«include»"| UC22
-  UC32 -->|"«include»"| UC41
+  A3 --- UC26
+  A3 --- UC28
+  A3 --- UC29
+  A3 --- UC30
+  A3 --- UC32
+  A3 --- UC33
+  A3 --- UC34
+  A3 --- UC35
+  A3 --- UC36
+  A3 --- UC38
+  A3 --- UC39
 
-  classDef ator fill:#dbe4ff,stroke:#3b5bdb,stroke-width:1px,color:#0b1a4a
-  classDef uc fill:#ffffff,stroke:#495057,stroke-width:1px,color:#111111
+  A3 --- UC50
+  A3 --- UC51
+  A3 --- UC52
+  A3 --- UC53
+  A3 --- UC54
+  A3 --- UC55
+  A3 --- UC56
+  A3 --- UC57
+
+
+  %% Administrador
+  A4 --- UC09
+  A4 --- UC14
+  A4 --- UC24
+  A4 --- UC37
+
+
+  %% =========================
+  %% ESTILOS
+  %% =========================
+
+  classDef ator fill:#ffffff,stroke:#3b5bdb,stroke-width:2px,color:#0b1a4a
+  classDef uc fill:#ffffff,stroke:#495057,stroke-width:1.5px,color:#111111
+
   class A1,A2,A3,A4 ator
-  class UC01,UC02,UC03,UC04,UC05,UC06,UC07,UC08,UC09,UC10,UC11,UC12,UC13,UC14,UC15,UC16,UC17,UC18,UC19,UC20,UC21,UC22,UC23,UC24,UC25,UC26,UC27,UC28,UC29,UC30,UC31,UC32,UC33,UC34,UC35,UC36,UC37,UC38,UC39,UC40,UC41,UC42,UC43,UC44,UC45,UC46,UC47,UC48,UC49,UC50,UC51,UC52 uc
-```
+  class UC01,UC02,UC03,UC04,UC05,UC06,UC07,UC08,UC09,UC10,UC11,UC12,UC13,UC14,UC15,UC16,UC17,UC18,UC19,UC20,UC21,UC22,UC23,UC24,UC25,UC26,UC27,UC28,UC29,UC30,UC31,UC32,UC33,UC34,UC35,UC36,UC37,UC38,UC39,UC40,UC41,UC42,UC43,UC44,UC45,UC46,UC47,UC48,UC49,UC50,UC51,UC52,UC53,UC54,UC55,UC56,UC57 uc
 
+```
 ### 1.1 Relações «include» / «extend» (e onde occurrem no código)
 
 | Relação | Ocorrência no código |
@@ -206,136 +318,174 @@ flowchart TB
 ## 2. Diagrama de Robustez
 
 Mapeamento da arquitetura `routes/controllers/services/repositories` descrita em
-`src/server/ARCHITECTURE.md`. As *boundaries* são telas e componentes de interface; os
-*controls* são os routers tRPC, os controllers e os services; as *entities* são os
-repositórios e as entidades persistidas.
+`src/server/ARCHITECTURE.md` para um diagrama de robustez, organizando os elementos
+segundo os estereótipos _actor_, _boundary_, _control_ e _entity_. As _boundaries_
+representam as interfaces e telas do sistema; os _controls_ representam os routers
+tRPC, controllers e services responsáveis pela coordenação das operações; e as
+_entities_ representam os objetos de domínio, repositórios e dados persistidos.
+
+Os atores interagem com as _boundaries_, que encaminham as solicitações aos
+_controls_, e estes acessam ou manipulam as _entities_, evidenciando o fluxo
+**ator → boundary → control → entity**.
+
 
 ```mermaid
-flowchart TB
-  subgraph ATORES["Atores"]
-    direction LR
-    A1(("Usuário<br/>não autenticado"))
-    A2(("Motorista"))
-    A3(("Gerente"))
-    A4(("Administrador"))
-  end
+flowchart LR
 
-  subgraph B["<<boundary>> — Interface (src/app, src/components)"]
-    direction TB
-    B1["Páginas públicas<br/>/entrar · /cadastrar · /recuperar-conta<br/>/atualizar-senha · /minha-conta · / · /offline"]
-    B2["Dashboard<br/>DashboardContent · PeriodHistoryContent<br/>DrilldownModal · CsvExportButton"]
-    B3["Roteiros<br/>RoteirosContent · RouteDialog · RouteHistoryDialog"]
-    B4["Cadastros<br/>PontosContent · PointDialog · DriversManagement<br/>FrotaPage · ConfiguracoesPage"]
-    B5["Aplicativo do motorista<br/>DriverDayContent · useSyncQueue"]
-    B6["<<boundary>> — Route Handlers<br/>/api/trpc · /api/auth/[...all]"]
-  end
+  %% =====================================================
+  %% ATORES
+  %% =====================================================
 
-  subgraph C["<<control>> — tRPC, controllers e services (src/server)"]
-    direction TB
-    C0["Middleware de sessão e perfil<br/>auth · driver · manager · admin"]
-    CR1["authRouter"]
-    CR2["driversRouter"]
-    CR3["fleetRouter"]
-    CR4["pointsRouter"]
-    CR5["routesRouter"]
-    CR6["dashboardRouter"]
-    CR7["parametersRouter"]
-    CR8["syncRouter"]
+  A1(["👤<br/>Usuário<br/>não autenticado"])
+  A2(["👤<br/>Motorista"])
+  A3(["👤<br/>Gerente"])
+  A4(["👤<br/>Administrador"])
 
-    CC1["AuthController<br/>AuthService"]
-    CC2["DriversController<br/>DriversService"]
-    CC3["FleetController<br/>FleetService"]
-    CC4["PointsController<br/>PointsService"]
-    CC5["RoutesController<br/>RoutesService"]
-    CC6["DashboardController<br/>DashboardService"]
-    CC7["ParametersController<br/>ParametersService"]
-    CC8["SyncController<br/>SyncService"]
 
-    CX1["<<externo>> NominatimGeocoder<br/>geocodificação de endereço"]
-    CX2["<<externo>> OsrmClient<br/>distância rodoviária"]
-    CX3["<<externo>> better-auth<br/>createUser · sessão · redefinição de senha"]
-    CX4["<<externo>> SMTP / Nodemailer<br/>e-mail de redefinição"]
-  end
+  %% =====================================================
+  %% BOUNDARY — INTERFACES
+  %% =====================================================
 
-  subgraph E["<<entity>> — Repositórios e persistência"]
-    direction TB
-    ER1["AuthRepository"]
-    ER2["DriversRepository<br/>encrypt / maskDocument"]
-    ER3["FleetRepository"]
-    ER4["PointsRepository"]
-    ER5["RoutesRepository"]
-    ER6["DashboardRepository"]
-    ER7["ParametersRepository"]
-    ER8["SyncRepository"]
+  B1(("«boundary»<br/>Interface pública<br/>Entrar · Cadastrar<br/>Recuperar conta<br/>Atualizar senha"))
 
-    ED1[("PostgreSQL · tabelas<br/>user · session · account · verification<br/>vehicle · parameter · point<br/>route · route_version · stop · stop_version")]
-    ED2[("Fila local do navegador<br/>IndexedDB · Dexie<br/>QueuedStopEvent")]
-  end
+  B2(("«boundary»<br/>Interface do motorista<br/>DriverDayContent<br/>Sincronização offline"))
+
+  B3(("«boundary»<br/>Interface do gerente<br/>Dashboard<br/>Roteiros<br/>Histórico"))
+
+  B4(("«boundary»<br/>Interface administrativa<br/>Pontos · Motoristas<br/>Frota · Configurações"))
+
+
+  %% =====================================================
+  %% CONTROL — CONTROLES
+  %% =====================================================
+
+  C1(("«control»<br/>AuthControl<br/>Autenticação<br/>Sessão · Recuperação"))
+
+  C2(("«control»<br/>DriverControl<br/>Gestão de motoristas"))
+
+  C3(("«control»<br/>FleetControl<br/>Gestão da frota"))
+
+  C4(("«control»<br/>PointControl<br/>Gestão de pontos"))
+
+  C5(("«control»<br/>RouteControl<br/>Gestão de roteiros<br/>Histórico de rotas"))
+
+  C6(("«control»<br/>DashboardControl<br/>Indicadores · Histórico<br/>Exportação"))
+
+  C7(("«control»<br/>ParameterControl<br/>Parâmetros do sistema"))
+
+  C8(("«control»<br/>SyncControl<br/>Sincronização offline"))
+
+
+  %% =====================================================
+  %% ENTITY — ENTIDADES
+  %% =====================================================
+
+  E1(["«entity»<br/>Usuário"])
+  E2(["«entity»<br/>Sessão"])
+  E3(["«entity»<br/>Motorista"])
+  E4(["«entity»<br/>Veículo"])
+  E5(["«entity»<br/>Ponto"])
+  E6(["«entity»<br/>Rota"])
+  E7(["«entity»<br/>Versão da rota"])
+  E8(["«entity»<br/>Parada"])
+  E9(["«entity»<br/>Parâmetro"])
+  E10(["«entity»<br/>Evento de sincronização"])
+
+
+  %% =====================================================
+  %% SISTEMAS EXTERNOS
+  %% =====================================================
+
+  X1(["«external»<br/>Nominatim"])
+  X2(["«external»<br/>OSRM"])
+  X3(["«external»<br/>better-auth"])
+  X4(["«external»<br/>SMTP / Nodemailer"])
+
+
+  %% =====================================================
+  %% ATORES → BOUNDARY
+  %% =====================================================
 
   A1 --> B1
-  A2 --> B5
-  A3 --> B2
+
+  A2 --> B2
+
   A3 --> B3
-  A3 --> B4
+
   A4 --> B4
 
-  B1 --> B6
-  B2 --> B6
-  B3 --> B6
-  B4 --> B6
-  B5 --> B6
 
-  B6 --> C0
-  C0 --> CR1
-  C0 --> CR2
-  C0 --> CR3
-  C0 --> CR4
-  C0 --> CR5
-  C0 --> CR6
-  C0 --> CR7
-  C0 --> CR8
+  %% =====================================================
+  %% BOUNDARY → CONTROL
+  %% =====================================================
 
-  CR1 --> CC1
-  CR2 --> CC2
-  CR3 --> CC3
-  CR4 --> CC4
-  CR5 --> CC5
-  CR6 --> CC6
-  CR7 --> CC7
-  CR8 --> CC8
+  B1 --> C1
 
-  CC1 --> ER1
-  CC2 --> ER2
-  CC3 --> ER3
-  CC4 --> ER4
-  CC5 --> ER5
-  CC6 --> ER6
-  CC7 --> ER7
-  CC8 --> ER8
+  B2 --> C5
+  B2 --> C8
 
-  ER1 --> ED1
-  ER2 --> ED1
-  ER3 --> ED1
-  ER4 --> ED1
-  ER5 --> ED1
-  ER6 --> ED1
-  ER7 --> ED1
-  ER8 --> ED1
+  B3 --> C5
+  B3 --> C6
 
-  CC4 --> CX1
-  CC5 --> CX2
-  CC2 --> CX3
-  CX3 --> CX4
-  B5 --> ED2
-  ED2 -->|"flush em lote (RF41)"| CR8
+  B4 --> C2
+  B4 --> C3
+  B4 --> C4
+  B4 --> C7
+
+
+  %% =====================================================
+  %% CONTROL → ENTITY
+  %% =====================================================
+
+  C1 --> E1
+  C1 --> E2
+
+  C2 --> E3
+
+  C3 --> E4
+
+  C4 --> E5
+
+  C5 --> E6
+  C5 --> E7
+  C5 --> E8
+
+  C6 --> E6
+  C6 --> E8
+
+  C7 --> E9
+
+  C8 --> E10
+  C8 --> E8
+
+
+  %% =====================================================
+  %% CONTROL → SISTEMAS EXTERNOS
+  %% =====================================================
+
+  C4 --> X1
+  C5 --> X2
+  C1 --> X3
+  X3 --> X4
+
+
+  %% =====================================================
+  %% ESTILIZAÇÃO
+  %% =====================================================
+
+  classDef ator fill:#fff,stroke:#222,stroke-width:2px,color:#111;
+  classDef boundary fill:#fff9c4,stroke:#222,stroke-width:2px,color:#111;
+  classDef control fill:#fff9c4,stroke:#222,stroke-width:2px,color:#111;
+  classDef entity fill:#fff9c4,stroke:#222,stroke-width:2px,color:#111;
+  classDef external fill:#e0e0e0,stroke:#555,stroke-width:2px,color:#111;
+
+  class A1,A2,A3,A4 ator;
+  class B1,B2,B3,B4 boundary;
+  class C1,C2,C3,C4,C5,C6,C7,C8 control;
+  class E1,E2,E3,E4,E5,E6,E7,E8,E9,E10 entity;
+  class X1,X2,X3,X4 external;
+
 ```
-
-**Leitura do fluxo (exemplo — RF37 a RF39):**
-`DriverDayContent` (*boundary*) → `routesRouter.startShift` → `RoutesController` →
-`RoutesService.startShift` → `RoutesRepository` → tabelas `route`, `stop`, `route_version`,
-`stop_version` (*entity*), com `OsrmClient` como integração externa quando a distância é
-recalculada.
-
 ---
 
 ## 3. Diagrama de Classes Conceitual
