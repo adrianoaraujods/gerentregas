@@ -1,3 +1,4 @@
+import { normalizePlate } from "@/lib/validators";
 import { BadRequestError, ConflictError, NotFoundError } from "@/server/api";
 
 import type { FleetRepository } from "./fleet.repository";
@@ -33,7 +34,7 @@ export class FleetService {
 
   async create(input: CreateVehicleInput) {
     const validated = createVehicleInputSchema.parse(input);
-    const plate = validated.plate.toUpperCase();
+    const plate = validated.plate;
     const existing = await this.repository.findByPlateIncludingDeleted(plate);
     if (existing) {
       throw new ConflictError(
@@ -52,13 +53,13 @@ export class FleetService {
 
   async update(input: UpdateVehicleInput) {
     const validated = updateVehicleInputSchema.parse(input);
-    const plate = validated.plate.toUpperCase();
+    const plate = validated.plate;
     const current = await this.repository.findById(validated.id);
     if (!current) {
       throw new NotFoundError("Veículo não encontrado.");
     }
 
-    if (plate !== current.plate.toUpperCase()) {
+    if (plate !== normalizePlate(current.plate)) {
       const existing = await this.repository.findByPlateIncludingDeleted(plate);
       if (existing && existing.id !== validated.id) {
         throw new ConflictError(

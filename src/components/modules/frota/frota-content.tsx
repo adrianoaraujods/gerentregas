@@ -1,9 +1,9 @@
 "use client";
 
+import { revalidateLogic } from "@tanstack/react-form";
 import { ArchiveRestore, Pencil, Trash } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-
 import {
   createAppColumnHelper,
   DataTable,
@@ -12,6 +12,7 @@ import {
   RowActionsItem,
   useAppTable,
 } from "@/components/data-table";
+import { useAppForm } from "@/components/hooks/use-app-form";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -39,12 +40,22 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import {
+  Field,
+  FieldContent,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field";
 import { Switch } from "@/components/ui/switch";
 import { api } from "@/lib/api/client";
 import { formatTrpcErrorMessage } from "@/lib/api/format-trpc-error";
-import type { VehicleOutput } from "@/server/modules/fleet";
+import { formatPlate } from "@/lib/formatter";
+import { normalizePlate } from "@/lib/validators";
+import {
+  type CreateVehicleInput,
+  type VehicleOutput,
+  vehicleFormSchema,
+} from "@/server/modules/fleet/fleet.types";
 
 const columnHelper = createAppColumnHelper<VehicleOutput>();
 
@@ -60,6 +71,130 @@ const defaultStatusFilter: ExtendedColumnFilter[] = [
   { id: "status", operator: "notEquals", value: ARCHIVED_STATUS },
 ];
 
+export function VehicleForm({
+  editingVehicle,
+  isSubmitting,
+  onCancel,
+  onSubmit,
+}: {
+  editingVehicle: VehicleOutput | null;
+  isSubmitting: boolean;
+  onCancel: () => void;
+  onSubmit: (values: CreateVehicleInput) => void;
+}) {
+  const form = useAppForm({
+    defaultValues: {
+      plate: normalizePlate(editingVehicle?.plate ?? ""),
+      model: editingVehicle?.model ?? "",
+      kmPerLiter: editingVehicle?.kmPerLiter ?? 0,
+      active: editingVehicle?.active ?? true,
+    },
+    validationLogic: revalidateLogic({ modeAfterSubmission: "change" }),
+    validators: { onDynamic: vehicleFormSchema },
+    onSubmit: async ({ value }) => {
+      onSubmit({ ...value, plate: normalizePlate(value.plate) });
+    },
+  });
+
+  return (
+    <form.AppForm>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          form.handleSubmit();
+        }}
+      >
+        <DialogHeader>
+          <DialogTitle>
+            {editingVehicle ? "Editar Veículo" : "Cadastrar Novo Veículo"}
+          </DialogTitle>
+          <DialogDescription>
+            Informe os dados do veículo para cálculo de custos e vinculo aos
+            roteiros.
+          </DialogDescription>
+        </DialogHeader>
+
+        <FieldGroup className="py-4">
+          <form.AppField name="plate">
+            {(field) => (
+              <field.PlateField
+                label="Placa"
+                props={{
+                  placeholder: "Ex: ABC-1D23",
+                  disabled: isSubmitting,
+                }}
+              />
+            )}
+          </form.AppField>
+
+          <form.AppField name="model">
+            {(field) => (
+              <field.TextField
+                label="Modelo / Tipo"
+                props={{
+                  placeholder: "Ex: Furgão Utilitário, Moto 160",
+                  disabled: isSubmitting,
+                }}
+              />
+            )}
+          </form.AppField>
+
+          <form.AppField name="kmPerLiter">
+            {(field) => (
+              <field.NumberField
+                label="Rendimento (km por Litro)"
+                props={{
+                  step: "0.1",
+                  min: "0.1",
+                  placeholder: "Ex: 12.5",
+                  disabled: isSubmitting,
+                }}
+              />
+            )}
+          </form.AppField>
+
+          <form.AppField name="active">
+            {(field) => (
+              <Field orientation="horizontal">
+                <FieldContent>
+                  <FieldLabel htmlFor={field.name}>Veículo Ativo</FieldLabel>
+                </FieldContent>
+                <Switch
+                  id={field.name}
+                  checked={field.state.value}
+                  onCheckedChange={(checked) => field.handleChange(checked)}
+                  disabled={isSubmitting}
+                />
+              </Field>
+            )}
+          </form.AppField>
+
+          <form.FormError />
+        </FieldGroup>
+
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onCancel}
+            disabled={isSubmitting}
+          >
+            Cancelar
+          </Button>
+          <form.SubmitButton className="w-auto" disabled={isSubmitting}>
+            {isSubmitting
+              ? "Salvando..."
+              : editingVehicle
+                ? "Salvar Alterações"
+                : "Cadastrar"}
+          </form.SubmitButton>
+        </DialogFooter>
+      </form>
+    </form.AppForm>
+  );
+}
+
 export function FrotaContent() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState<VehicleOutput | null>(
@@ -68,12 +203,6 @@ export function FrotaContent() {
   const [vehicleToDelete, setVehicleToDelete] = useState<VehicleOutput | null>(
     null,
   );
-
-  // Form State
-  const [plate, setPlate] = useState("");
-  const [model, setModel] = useState("");
-  const [kmPerLiter, setKmPerLiter] = useState("");
-  const [active, setActive] = useState(true);
 
   const utils = api.useUtils();
 
@@ -131,19 +260,11 @@ export function FrotaContent() {
 
   const openCreateModal = () => {
     setEditingVehicle(null);
-    setPlate("");
-    setModel("");
-    setKmPerLiter("");
-    setActive(true);
     setIsModalOpen(true);
   };
 
   const openEditModal = (v: VehicleOutput) => {
     setEditingVehicle(v);
-    setPlate(v.plate);
-    setModel(v.model);
-    setKmPerLiter(v.kmPerLiter.toString());
-    setActive(v.active);
     setIsModalOpen(true);
   };
 
@@ -152,34 +273,21 @@ export function FrotaContent() {
     setEditingVehicle(null);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-
-    const numericKm = parseFloat(kmPerLiter.replace(",", "."));
-    if (Number.isNaN(numericKm) || numericKm <= 0) {
-      toast.error("Informe um rendimento (km/L) válido e positivo.");
-      return;
-    }
-
-    if (!plate.trim() || !model.trim()) {
-      toast.error("Preencha a placa e o modelo do veículo.");
-      return;
-    }
-
+  const handleFormSubmit = (values: CreateVehicleInput) => {
     if (editingVehicle) {
       updateMutation.mutate({
         id: editingVehicle.id,
-        plate,
-        model,
-        kmPerLiter: numericKm,
-        active,
+        plate: values.plate,
+        model: values.model,
+        kmPerLiter: values.kmPerLiter,
+        active: values.active,
       });
     } else {
       createMutation.mutate({
-        plate,
-        model,
-        kmPerLiter: numericKm,
-        active,
+        plate: values.plate,
+        model: values.model,
+        kmPerLiter: values.kmPerLiter,
+        active: values.active,
       });
     }
   };
@@ -190,7 +298,7 @@ export function FrotaContent() {
       columnHelper.accessor("plate", {
         meta: { variant: "text", label: "Placa" },
         cell: ({ getValue }) => (
-          <span className="font-mono font-bold">{getValue()}</span>
+          <span className="font-mono font-bold">{formatPlate(getValue())}</span>
         ),
       }),
       columnHelper.accessor("model", {
@@ -301,86 +409,13 @@ export function FrotaContent() {
 
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent>
-          <form onSubmit={handleSubmit}>
-            <DialogHeader>
-              <DialogTitle>
-                {editingVehicle ? "Editar Veículo" : "Cadastrar Novo Veículo"}
-              </DialogTitle>
-              <DialogDescription>
-                Informe os dados do veículo para cálculo de custos e vinculo aos
-                roteiros.
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="grid gap-4 py-4">
-              <div className="grid gap-2">
-                <Label htmlFor="plate">Placa</Label>
-                <Input
-                  id="plate"
-                  placeholder="Ex: ABC-1D23"
-                  value={plate}
-                  onChange={(e) => setPlate(e.target.value)}
-                  disabled={isSubmitting}
-                  required
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="model">Modelo / Tipo</Label>
-                <Input
-                  id="model"
-                  placeholder="Ex: Furgão Utilitário, Moto 160"
-                  value={model}
-                  onChange={(e) => setModel(e.target.value)}
-                  disabled={isSubmitting}
-                  required
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="kmPerLiter">Rendimento (km por Litro)</Label>
-                <Input
-                  id="kmPerLiter"
-                  type="number"
-                  step="0.1"
-                  min="0.1"
-                  placeholder="Ex: 12.5"
-                  value={kmPerLiter}
-                  onChange={(e) => setKmPerLiter(e.target.value)}
-                  disabled={isSubmitting}
-                  required
-                />
-              </div>
-
-              <div className="flex items-center justify-between pt-2">
-                <Label htmlFor="active">Veículo Ativo</Label>
-                <Switch
-                  id="active"
-                  checked={active}
-                  onCheckedChange={setActive}
-                  disabled={isSubmitting}
-                />
-              </div>
-            </div>
-
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={closeModal}
-                disabled={isSubmitting}
-              >
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting
-                  ? "Salvando..."
-                  : editingVehicle
-                    ? "Salvar Alterações"
-                    : "Cadastrar"}
-              </Button>
-            </DialogFooter>
-          </form>
+          <VehicleForm
+            key={editingVehicle ? `edit-${editingVehicle.id}` : "create"}
+            editingVehicle={editingVehicle}
+            isSubmitting={isSubmitting}
+            onCancel={closeModal}
+            onSubmit={handleFormSubmit}
+          />
         </DialogContent>
       </Dialog>
 
@@ -396,7 +431,7 @@ export function FrotaContent() {
             <AlertDialogDescription>
               Tem certeza que deseja excluir o veículo{" "}
               <span className="font-mono font-bold">
-                {vehicleToDelete?.plate}
+                {vehicleToDelete ? formatPlate(vehicleToDelete.plate) : ""}
               </span>
               ? Se ele não estiver vinculado a nenhum roteiro, será excluído
               permanentemente. Caso contrário, será arquivado (podendo ser

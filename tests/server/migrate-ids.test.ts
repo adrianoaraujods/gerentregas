@@ -16,7 +16,7 @@ import { isUuid, migrateIdsToUuid } from "@/server/db/scripts/migrate-ids";
 const LEGACY_DRIVER_ID = "legacy-driver-id-0001";
 const LEGACY_MANAGER_ID = "legacy-manager-id-0001";
 const LEGACY_VEHICLE_ID = "seed-vehicle-9999";
-const LEGACY_PLATE = "LGC-9999";
+const LEGACY_PLATE = "LGC9999";
 
 describe("migrateIdsToUuid", () => {
   it("migrates non-UUID user and vehicle ids and repoints all references", async () => {

@@ -6,6 +6,7 @@ import { FormError } from "@/components/fields/form-error";
 import { MoneyField } from "@/components/fields/money-field";
 import { NumberField } from "@/components/fields/number-field";
 import { PhoneField } from "@/components/fields/phone-field";
+import { PlateField } from "@/components/fields/plate-field";
 import { SelectField } from "@/components/fields/select-field";
 import { SubmitButton } from "@/components/fields/submit-button";
 import { TextField } from "@/components/fields/text-field";
@@ -23,6 +24,7 @@ const { useAppForm } = createFormHook({
     MoneyField,
     NumberField,
     PhoneField,
+    PlateField,
     SelectField,
     TextField,
     TextareaField,

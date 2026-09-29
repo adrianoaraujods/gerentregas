@@ -81,7 +81,7 @@ describe("RoutesService", () => {
 
     const vehicleA = await fleetRepository.create({
       id: crypto.randomUUID(),
-      plate: "TST-0001",
+      plate: "TST0001",
       model: "Moto Cargo 160",
       kmPerLiterHundredths: 1250,
       active: true,
@@ -90,7 +90,7 @@ describe("RoutesService", () => {
 
     const vehicleB = await fleetRepository.create({
       id: crypto.randomUUID(),
-      plate: "TST-0002",
+      plate: "TST0002",
       model: "Moto Cargo 250",
       kmPerLiterHundredths: 1000,
       active: true,
@@ -843,7 +843,7 @@ describe("RoutesService", () => {
         .insert(vehicle)
         .values({
           id: crypto.randomUUID(),
-          plate: `TEST-${crypto.randomUUID().slice(0, 8)}`,
+          plate: `TST${crypto.randomUUID().replace(/\D/g, "").slice(0, 4).padEnd(4, "0")}`,
           model: "Test Vehicle",
           kmPerLiterHundredths: 1000,
           active: true,

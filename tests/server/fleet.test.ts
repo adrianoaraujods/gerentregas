@@ -36,14 +36,14 @@ describe("FleetService", () => {
   describe("create", () => {
     it("creates a new vehicle successfully", async () => {
       const result = await service.create({
-        plate: "BRA-2E19",
+        plate: "BRA2E19",
         model: "Moto Cargo 160",
         kmPerLiter: 35.5,
         active: true,
       });
 
       expect(result.id).toBeDefined();
-      expect(result.plate).toBe("BRA-2E19");
+      expect(result.plate).toBe("BRA2E19");
       expect(result.model).toBe("Moto Cargo 160");
       expect(result.kmPerLiterHundredths).toBe(3550);
       expect(result.active).toBe(true);
@@ -56,12 +56,12 @@ describe("FleetService", () => {
         kmPerLiter: 10.0,
       });
 
-      expect(result.plate).toBe("ABC-1234");
+      expect(result.plate).toBe("ABC1234");
     });
 
     it("rejects duplicate plate creation", async () => {
       await service.create({
-        plate: "DUP-1111",
+        plate: "DUP1111",
         model: "Caminhão Leve",
         kmPerLiter: 8.0,
       });
@@ -78,7 +78,7 @@ describe("FleetService", () => {
     it("rejects negative or zero kmPerLiter", async () => {
       await expect(
         service.create({
-          plate: "NEG-0000",
+          plate: "NEG0000",
           model: "Teste",
           kmPerLiter: -5,
         }),
@@ -86,7 +86,7 @@ describe("FleetService", () => {
 
       await expect(
         service.create({
-          plate: "ZERO-000",
+          plate: "ABC0000",
           model: "Teste",
           kmPerLiter: 0,
         }),
@@ -97,14 +97,14 @@ describe("FleetService", () => {
   describe("getById & list", () => {
     it("returns vehicle by id", async () => {
       const created = await service.create({
-        plate: "GET-9999",
+        plate: "GET9999",
         model: "Kombu",
         kmPerLiter: 12.0,
       });
 
       const found = await service.getById(created.id);
       expect(found.id).toBe(created.id);
-      expect(found.plate).toBe("GET-9999");
+      expect(found.plate).toBe("GET9999");
     });
 
     it("throws NotFoundError when vehicle does not exist", async () => {
@@ -115,14 +115,14 @@ describe("FleetService", () => {
 
     it("filters active vehicles when activeOnly is true", async () => {
       const v1 = await service.create({
-        plate: "ACT-0001",
+        plate: "ACT0001",
         model: "Ativo",
         kmPerLiter: 10.0,
         active: true,
       });
 
       const v2 = await service.create({
-        plate: "INA-0002",
+        plate: "INA0002",
         model: "Inativo",
         kmPerLiter: 10.0,
         active: false,
@@ -141,7 +141,7 @@ describe("FleetService", () => {
   describe("update", () => {
     it("updates existing vehicle details", async () => {
       const created = await service.create({
-        plate: "UPD-1000",
+        plate: "UPD1000",
         model: "Modelo Antigo",
         kmPerLiter: 10.0,
         active: true,
@@ -149,7 +149,7 @@ describe("FleetService", () => {
 
       const updated = await service.update({
         id: created.id,
-        plate: "UPD-1000",
+        plate: "UPD1000",
         model: "Modelo Novo",
         kmPerLiter: 14.2,
         active: false,
@@ -162,13 +162,13 @@ describe("FleetService", () => {
 
     it("throws ConflictError when updating to a plate used by another vehicle", async () => {
       const _v1 = await service.create({
-        plate: "PLT-0001",
+        plate: "PLT0001",
         model: "Carro 1",
         kmPerLiter: 10.0,
       });
 
       const v2 = await service.create({
-        plate: "PLT-0002",
+        plate: "PLT0002",
         model: "Carro 2",
         kmPerLiter: 12.0,
       });
@@ -176,7 +176,7 @@ describe("FleetService", () => {
       await expect(
         service.update({
           id: v2.id,
-          plate: "PLT-0001",
+          plate: "PLT0001",
           model: "Carro 2",
           kmPerLiter: 12.0,
         }),
@@ -187,7 +187,7 @@ describe("FleetService", () => {
   describe("delete", () => {
     it("permanently deletes an unused vehicle", async () => {
       const created = await service.create({
-        plate: "DEL-7777",
+        plate: "DEL7777",
         model: "Para Deletar",
         kmPerLiter: 15.0,
       });
@@ -206,7 +206,7 @@ describe("FleetService", () => {
 
     it("archives a vehicle referenced by a route", async () => {
       const created = await service.create({
-        plate: "ARC-0001",
+        plate: "ARC0001",
         model: "Usado em roteiro",
         kmPerLiter: 10.0,
       });
@@ -237,7 +237,7 @@ describe("FleetService", () => {
 
     it("archives a vehicle referenced only by a route version", async () => {
       const created = await service.create({
-        plate: "ARV-0002",
+        plate: "ARV0002",
         model: "Usado em versão antiga",
         kmPerLiter: 10.0,
       });
@@ -271,7 +271,7 @@ describe("FleetService", () => {
 
     it("rejects re-creating the plate of an archived vehicle with a friendly error", async () => {
       const created = await service.create({
-        plate: "DUP-ARC1",
+        plate: "DUP1A11",
         model: "Arquivado",
         kmPerLiter: 10.0,
       });
@@ -289,7 +289,7 @@ describe("FleetService", () => {
 
       await expect(
         service.create({
-          plate: "DUP-ARC1",
+          plate: "DUP1A11",
           model: "Tentativa de recriar",
           kmPerLiter: 12.0,
         }),
@@ -306,7 +306,7 @@ describe("FleetService", () => {
   describe("restore", () => {
     it("restores an archived vehicle", async () => {
       const created = await service.create({
-        plate: "RES-0001",
+        plate: "RES0001",
         model: "Para Restaurar",
         kmPerLiter: 10.0,
       });
@@ -332,7 +332,7 @@ describe("FleetService", () => {
 
     it("rejects restoring a vehicle that is not archived", async () => {
       const created = await service.create({
-        plate: "RES-0002",
+        plate: "RES0002",
         model: "Ativo",
         kmPerLiter: 10.0,
       });

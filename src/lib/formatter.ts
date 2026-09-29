@@ -1,3 +1,5 @@
+import { normalizePlate } from "@/lib/validators";
+
 export function formatNumber(value: string) {
   return value.replace(/[^0-9]/g, "");
 }
@@ -38,6 +40,12 @@ export function formatPhone(value: string) {
   }
 
   return value;
+}
+
+export function formatPlate(value: string) {
+  const normalized = normalizePlate(value);
+  if (!/^[A-Z]{3}(\d{4}|\d[A-Z]\d{2})$/.test(normalized)) return normalized;
+  return normalized.replace(/^([A-Z]{3})([A-Z0-9]{4})$/, "$1-$2");
 }
 
 export function formatBRL(value: number) {

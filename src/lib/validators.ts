@@ -16,3 +16,19 @@ export function normalizePhone(value: string) {
 
   return digits;
 }
+
+export function normalizePlate(value: string) {
+  return value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+}
+
+export const normalizedPlateSchema = z
+  .string()
+  .regex(
+    /^[A-Z]{3}(\d{4}|\d[A-Z]\d{2})$/,
+    "Placa inválida. Use o formato ABC-1234 ou ABC-1D23",
+  );
+
+export const plateSchema = z
+  .string()
+  .transform(normalizePlate)
+  .pipe(normalizedPlateSchema);

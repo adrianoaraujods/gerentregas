@@ -1,6 +1,7 @@
 import "dotenv/config";
 
-import { eq } from "drizzle-orm";
+import { eq, like } from "drizzle-orm";
+import { normalizePlate } from "@/lib/validators";
 import { db } from "@/server/db";
 import { parameter } from "@/server/db/schemas/parameters";
 import { ensureAdmin } from "@/server/db/scripts/ensure-admin";
@@ -47,7 +48,7 @@ async function main() {
   if (!existingVehicle) {
     await db.insert(vehicle).values({
       id: crypto.randomUUID(),
-      plate: "ABC-1D23",
+      plate: "ABC1D23",
       model: "Furgão Utilitário",
       kmPerLiterHundredths: 1250, // 12.50 km/L
       active: true,
@@ -55,6 +56,23 @@ async function main() {
     console.log("Default active vehicle seeded (ABC-1D23)");
   } else {
     console.log("Vehicles already exist, skipping vehicle seed");
+  }
+
+  // Backfill: normalize legacy hyphenated plates to uppercase without hyphen
+  const hyphenated = await db
+    .select({ id: vehicle.id, plate: vehicle.plate })
+    .from(vehicle)
+    .where(like(vehicle.plate, "%-%"));
+  for (const row of hyphenated) {
+    if (row.plate.startsWith("MIGRATED-")) continue;
+    const normalized = normalizePlate(row.plate);
+    if (normalized && normalized !== row.plate) {
+      await db
+        .update(vehicle)
+        .set({ plate: normalized })
+        .where(eq(vehicle.id, row.id));
+      console.log(`Normalized plate ${row.plate} -> ${normalized}`);
+    }
   }
 }
 

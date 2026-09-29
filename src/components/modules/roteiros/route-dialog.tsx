@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/select";
 import { api } from "@/lib/api/client";
 import { formatTrpcErrorMessage } from "@/lib/api/format-trpc-error";
+import { formatPlate } from "@/lib/formatter";
 
 import { RouteMap } from "./route-map";
 
@@ -242,7 +243,7 @@ export function RouteDialog({
                   items={vehicles?.map(
                     (v: { id: string; plate: string; model: string }) => ({
                       value: v.id,
-                      label: `${v.plate} - ${v.model}`,
+                      label: `${formatPlate(v.plate)} - ${v.model}`,
                     }),
                   )}
                 >
@@ -258,9 +259,9 @@ export function RouteDialog({
                         <SelectItem
                           key={v.id}
                           value={v.id}
-                          label={`${v.plate} - ${v.model}`}
+                          label={`${formatPlate(v.plate)} - ${v.model}`}
                         >
-                          {v.plate} - {v.model}
+                          {formatPlate(v.plate)} - {v.model}
                         </SelectItem>
                       ),
                     )}

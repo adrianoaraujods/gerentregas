@@ -41,6 +41,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api/client";
 import { formatTrpcErrorMessage } from "@/lib/api/format-trpc-error";
 import { toNavigationStopInput } from "@/lib/driver-navigation";
+import { formatPlate } from "@/lib/formatter";
 import { buildNavigationLinks } from "@/lib/navigation-links";
 import {
   formatDwellSeconds as formatDwell,
@@ -67,7 +68,7 @@ function formatTime(value: Date | string | null | undefined): string | null {
 }
 
 function vehicleLabel(vehicle: VehicleOutput): string {
-  return `${vehicle.plate} — ${vehicle.model}`;
+  return `${formatPlate(vehicle.plate)} — ${vehicle.model}`;
 }
 
 function stopTitle(stop: DriverStop): string {

@@ -27,7 +27,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api/client";
 import { formatTrpcErrorMessage } from "@/lib/api/format-trpc-error";
-import { formatBRL } from "@/lib/formatter";
+import { formatBRL, formatPlate } from "@/lib/formatter";
 import type { RouterOutputs } from "@/server/api/router";
 
 import { RouteDialog } from "./route-dialog";
@@ -107,7 +107,7 @@ export function RoteirosContent() {
   const getVehiclePlate = (id: string | null | undefined) => {
     if (!id) return "Nenhum";
     const vehicle = vehiclesData?.find((v) => v.id === id);
-    return vehicle?.plate || "Desconhecido";
+    return vehicle?.plate ? formatPlate(vehicle.plate) : "Desconhecido";
   };
 
   const routes = routesData?.routes ?? [];
