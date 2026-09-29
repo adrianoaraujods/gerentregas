@@ -1,0 +1,208 @@
+' Gerentregas — Diagrama de Classes Conceitual
+' Fonte: docs/diagramas.md + docs/modelo-dados.md (esquemas Drizzle em
+' src/server/db/schemas/*). Atributos "derivado" sao calculados no servico.
+@startuml 03-classes-conceitual
+title Gerentregas — Diagrama de Classes Conceitual
+left to right direction
+
+skinparam class {
+  BackgroundColor<<entidade>> #EBFBEE
+  BackgroundColor<<enumerado>> #FFF9C4
+}
+
+class User <<entidade>> {
+  +id : text <<PK>>
+  +name : text
+  +email : text <<UK>>
+  +email_verified : boolean
+  +image : text
+  +role : UserRole
+  +phone : text
+  +document : text
+  +banned : boolean
+  +ban_reason : text
+  +ban_expires : timestamp
+  +deleted_at : timestamp
+  +created_at : timestamp
+  +updated_at : timestamp
+}
+
+class Session <<entidade>> {
+  +id : text <<PK>>
+  +token : text <<UK>>
+  +expires_at : timestamp
+  +user_id : text <<FK>>
+  +ip_address : text
+  +user_agent : text
+  +impersonated_by : text
+  +created_at : timestamp
+  +updated_at : timestamp
+}
+
+class Account <<entidade>> {
+  +id : text <<PK>>
+  +account_id : text
+  +provider_id : text
+  +user_id : text <<FK>>
+  +password : text
+  +access_token : text
+  +refresh_token : text
+  +id_token : text
+  +scope : text
+  +created_at : timestamp
+  +updated_at : timestamp
+}
+
+class Verification <<entidade>> {
+  +id : text <<PK>>
+  +identifier : text
+  +value : text
+  +expires_at : timestamp
+  +created_at : timestamp
+  +updated_at : timestamp
+}
+
+class Vehicle <<entidade>> {
+  +id : text <<PK>>
+  +plate : text <<UK>>
+  +model : text
+  +km_per_liter_hundredths : integer
+  +active : boolean
+  +deleted_at : timestamp
+  +created_at : timestamp
+  +updated_at : timestamp
+}
+
+class Parameter <<entidade>> {
+  +id : text <<PK>>
+  +fuel_price_per_liter : integer
+  +standard_workday_duration : integer
+  +created_at : timestamp
+  +updated_at : timestamp
+}
+
+class Point <<entidade>> {
+  +id : text <<PK>>
+  +name : text
+  +address : text
+  +latitude : real
+  +longitude : real
+  +geocode_status : GeocodeStatus
+  +deleted_at : timestamp
+  +created_at : timestamp
+  +updated_at : timestamp
+}
+
+class Route <<entidade>> {
+  +id : text <<PK>>
+  +manager_id : text <<FK>>
+  +driver_id : text <<FK>>
+  +vehicle_id : text <<FK>>
+  +date : timestamp
+  +status : RouteStatus
+  +current_version : text
+  +distance_km_hundredths : integer
+  +deleted_at : timestamp
+  +created_at : timestamp
+  +updated_at : timestamp
+  +distance_km : number <<derivado>>
+  +cost : number <<derivado>>
+  +totalDwellSeconds : number <<derivado>>
+}
+
+class RouteVersion <<entidade>> {
+  +id : text <<PK>>
+  +route_id : text <<FK>>
+  +version : text
+  +manager_id : text <<FK>>
+  +driver_id : text <<FK>>
+  +vehicle_id : text <<FK>>
+  +date : timestamp
+  +status : RouteStatus
+  +distance_km_hundredths : integer
+  +created_at : timestamp
+}
+
+class Stop <<entidade>> {
+  +id : text <<PK>>
+  +route_id : text <<FK>>
+  +point_id : text <<FK>>
+  +order : text
+  +address_snapshot : text
+  +latitude_snapshot : real
+  +longitude_snapshot : real
+  +arrival_at : timestamp
+  +departure_at : timestamp
+  +deleted_at : timestamp
+  +created_at : timestamp
+  +updated_at : timestamp
+  +dwellSeconds : number <<derivado, RN02>>
+}
+
+class StopVersion <<entidade>> {
+  +id : text <<PK>>
+  +stop_id : text <<FK>>
+  +route_version_id : text <<FK>>
+  +order : text
+  +point_id : text <<FK>>
+  +address_snapshot : text
+  +latitude_snapshot : real
+  +longitude_snapshot : real
+  +arrival_at : timestamp
+  +departure_at : timestamp
+  +deleted_at : timestamp
+  +version_type : StopVersionType
+  +actor_id : text <<FK>>
+  +created_at : timestamp
+}
+
+enum UserRole <<enumerado>> {
+  driver
+  manager
+  admin
+}
+
+enum GeocodeStatus <<enumerado>> {
+  success
+  failed
+  manual
+}
+
+enum RouteStatus <<enumerado>> {
+  draft
+  in_flight
+  concluded
+  cancelled
+}
+
+enum StopVersionType <<enumerado>> {
+  structural
+  correction
+}
+
+User "1" --> "0..*" Session : sessoes
+User "1" --> "0..*" Account : contas
+User "1" --> "0..*" Route : gerente
+User "1" --> "0..*" Route : motorista
+User "1" --> "0..*" RouteVersion : gerente
+User "1" --> "0..*" RouteVersion : motorista
+User "0..1" --> "0..*" StopVersion : ator da correcao
+Vehicle "0..1" --> "0..*" Route : veiculo do dia
+Vehicle "0..1" --> "0..*" RouteVersion : veiculo
+Route "1" --> "0..*" RouteVersion : versoes
+Route "1" --> "1..*" Stop : paradas
+Point "1" --> "0..*" Stop : ponto
+Point "1" --> "0..*" StopVersion : ponto
+Stop "1" --> "0..*" StopVersion : versoes
+RouteVersion "1" --> "0..*" StopVersion : paradas
+
+User --> UserRole : role
+Point --> GeocodeStatus : geocode_status
+Route --> RouteStatus : status
+RouteVersion --> RouteStatus : status
+StopVersion --> StopVersionType : version_type
+
+note right of Route : RN05: um roteiro por motorista e data (driver_id + date).\nRN07: custo = distance_km x preco_combustivel / km_por_litro\ndo veiculo; sem veiculo vinculado o custo e indeterminado.
+note right of Stop : RN01: order = 1 e a origem, nao acumula dwell.\nConclusao derivada de departure_at (ADR 0003).
+note right of Parameter : Registro unico com id = "system".
+@enduml

@@ -1,0 +1,96 @@
+' Gerentregas — Diagrama de Robustez
+' Fonte: docs/diagramas.md | Mapeamento da arquitetura
+' routes/controllers/services/repositories (src/server/ARCHITECTURE.md).
+' Fluxo: ator -> boundary -> control -> entity.
+' Usa as palavras-chave nativas de robustez do PlantUML
+' (boundary / control / entity), nao "class".
+@startuml 02-robustez
+title Gerentregas — Diagrama de Robustez
+left to right direction
+
+skinparam boundary {
+  BackgroundColor #FFF9C4
+  BorderColor #222222
+}
+skinparam control {
+  BackgroundColor #E7F5FF
+  BorderColor #222222
+}
+skinparam entity {
+  BackgroundColor #EBFBEE
+  BorderColor #222222
+}
+skinparam collections {
+  BackgroundColor #E9ECEF
+  BorderColor #555555
+}
+
+actor "Usuário\nnão autenticado" as A1
+actor "Motorista" as A2
+actor "Gerente" as A3
+actor "Administrador" as A4
+
+boundary "Interface pública\nEntrar - Cadastrar\nRecuperar conta" as B1
+boundary "Interface do motorista\nDriverDayContent\nSincronização offline" as B2
+boundary "Interface do gerente\nDashboard - Roteiros\nHistórico" as B3
+boundary "Interface administrativa\nPontos - Motoristas\nFrota - Configurações" as B4
+
+control "AuthControl\nAutenticação\nSessão - Recuperação" as C1
+control "DriverControl\nGestão de motoristas" as C2
+control "FleetControl\nGestão da frota" as C3
+control "PointControl\nGestão de pontos" as C4
+control "RouteControl\nGestão de roteiros\nHistórico de rotas" as C5
+control "DashboardControl\nIndicadores - Histórico\nExportação" as C6
+control "ParameterControl\nParâmetros do sistema" as C7
+control "SyncControl\nSincronização offline" as C8
+
+entity "Usuário" as E1
+entity "Sessão" as E2
+entity "Motorista" as E3
+entity "Veículo" as E4
+entity "Ponto" as E5
+entity "Rota" as E6
+entity "Versão da rota" as E7
+entity "Parada" as E8
+entity "Parâmetro" as E9
+entity "Evento de\nsincronização" as E10
+
+collections "Sistemas externos\nNominatim - OSRM\nbetter-auth - SMTP" as X1
+
+' ---- atores -> boundary ----
+A1 --> B1
+A2 --> B2
+A3 --> B3
+A4 --> B4
+
+' ---- boundary -> control ----
+B1 --> C1
+B2 --> C5
+B2 --> C8
+B3 --> C5
+B3 --> C6
+B4 --> C2
+B4 --> C3
+B4 --> C4
+B4 --> C7
+
+' ---- control -> entity ----
+C1 --> E1
+C1 --> E2
+C2 --> E3
+C3 --> E4
+C4 --> E5
+C5 --> E6
+C5 --> E7
+C5 --> E8
+C6 --> E6
+C6 --> E8
+C7 --> E9
+C8 --> E10
+C8 --> E8
+
+' ---- control -> sistemas externos ----
+C4 --> X1 : geocodifica
+C5 --> X1 : distancia
+C1 --> X1 : auth + e-mail
+@enduml

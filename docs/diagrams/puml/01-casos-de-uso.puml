@@ -1,0 +1,185 @@
+' Gerentregas — Diagrama de Casos de Uso
+' Fonte: docs/diagramas.md | UCs derivados das procedures tRPC (auth, drivers,
+' fleet, points, routes, dashboard, parameters, sync) e das telas correspondentes.
+' A especializacao Administrador -> Gerente reflete roleMiddleware(["manager", "admin"]).
+@startuml 01-casos-de-uso
+title Gerentregas — Diagrama de Casos de Uso
+left to right direction
+
+skinparam actor {
+  BackgroundColor white
+  BorderColor #3b5bdb
+}
+skinparam usecase {
+  BackgroundColor white
+  BorderColor #495057
+}
+skinparam package {
+  BackgroundColor #F1F3F5
+  BorderColor #adb5bd
+}
+
+actor "Usuário\nnão autenticado" as NaoAutenticado
+actor "Motorista /\nMotoboy" as Motorista
+actor "Gerente /\nCoordenador" as Gerente
+actor "Administrador" as Administrador
+
+Administr --|> Gerente : especializa
+
+rectangle "Sistema de Gestão de Rotas e Entregas" {
+  package "Conta e acesso" {
+    usecase "UC01\nCadastrar-se" as UC01
+    usecase "UC02\nAutenticar-se" as UC02
+    usecase "UC03\nEncerrar sessão" as UC03
+    usecase "UC04\nSolicitar redefinição\nde senha" as UC04
+    usecase "UC05\nRedefinir senha\ncom token" as UC05
+    usecase "UC06\nConsultar próprio perfil" as UC06
+    usecase "UC07\nAlterar tema da conta" as UC07
+  }
+  package "Gestão de usuários" {
+    usecase "UC08\nCadastrar motorista" as UC08
+    usecase "UC09\nCadastrar gerente" as UC09
+    usecase "UC10\nListar usuários" as UC10
+    usecase "UC11\nConsultar usuário" as UC11
+    usecase "UC12\nAtualizar dados\ndo usuário" as UC12
+    usecase "UC13\nExcluir usuário" as UC13
+    usecase "UC14\nRestaurar usuário" as UC14
+  }
+  package "Gestão de veículos" {
+    usecase "UC15\nCadastrar veículo" as UC15
+    usecase "UC16\nListar veículos" as UC16
+    usecase "UC17\nEditar veículo" as UC17
+    usecase "UC18\nExcluir veículo" as UC18
+  }
+  package "Gestão de pontos" {
+    usecase "UC19\nCadastrar ponto" as UC19
+    usecase "UC20\nConsultar ponto" as UC20
+    usecase "UC21\nListar pontos" as UC21
+    usecase "UC22\nEditar ponto" as UC22
+    usecase "UC23\nExcluir ponto" as UC23
+    usecase "UC24\nRestaurar ponto" as UC24
+    usecase "UC25\nGeocodificar endereço" as UC25
+  }
+  package "Gestão de roteiros" {
+    usecase "UC26\nMontar roteiro do dia" as UC26
+    usecase "UC27\nCalcular distância\ndo roteiro" as UC27
+    usecase "UC28\nListar roteiros" as UC28
+    usecase "UC29\nConsultar roteiro" as UC29
+    usecase "UC30\nEditar roteiro" as UC30
+    usecase "UC31\nGerar versão\ndo roteiro" as UC31
+    usecase "UC32\nAdicionar parada" as UC32
+    usecase "UC33\nEditar parada" as UC33
+    usecase "UC34\nConcluir parada" as UC34
+    usecase "UC35\nExcluir parada" as UC35
+    usecase "UC36\nExcluir roteiro" as UC36
+    usecase "UC37\nRestaurar roteiro" as UC37
+    usecase "UC38\nConsultar histórico\nde versões" as UC38
+    usecase "UC39\nCorrigir horários\nda parada" as UC39
+  }
+  package "Execução do roteiro" {
+    usecase "UC40\nConsultar roteiro do dia" as UC40
+    usecase "UC41\nIniciar turno" as UC41
+    usecase "UC42\nEscolher veículo" as UC42
+    usecase "UC43\nRegistrar chegada" as UC43
+    usecase "UC44\nRegistrar saída" as UC44
+    usecase "UC45\nRegistrar tempo parado" as UC45
+    usecase "UC46\nRegistrar chegada\ne saída offline" as UC46
+    usecase "UC47\nSincronizar registros\npendentes" as UC47
+    usecase "UC48\nReprocessar registro\nrejeitado" as UC48
+    usecase "UC49\nDescartar registro\nrejeitado" as UC49
+  }
+  package "Dashboard e relatórios" {
+    usecase "UC50\nConsultar dashboard\ndiário" as UC50
+    usecase "UC51\nConsultar dashboard\nmensal" as UC51
+    usecase "UC52\nConsultar dashboard\npor período" as UC52
+    usecase "UC53\nConsultar detalhes\nde um dia" as UC53
+    usecase "UC54\nExportar relatório CSV" as UC54
+    usecase "UC55\nConsultar jornada padrão" as UC55
+    usecase "UC56\nConsultar parâmetros" as UC56
+    usecase "UC57\nAtualizar parâmetros" as UC57
+  }
+}
+
+' ---- includes ----
+UC04 ..> UC05 : <<include>>
+UC19 ..> UC25 : <<include>>
+UC22 ..> UC25 : <<include>>
+UC26 ..> UC27 : <<include>>
+UC30 ..> UC31 : <<include>>
+UC32 ..> UC27 : <<include>>
+UC41 ..> UC42 : <<include>>
+UC44 ..> UC45 : <<include>>
+UC54 ..> UC53 : <<include>>
+
+' ---- extends ----
+UC46 ..> UC43 : <<extend>>
+UC46 ..> UC44 : <<extend>>
+UC47 ..> UC46 : <<extend>>
+UC48 ..> UC47 : <<extend>>
+UC49 ..> UC47 : <<extend>>
+UC39 ..> UC33 : <<extend>>
+
+' ---- associacoes: usuario nao autenticado ----
+NaoAutenticado -- UC01
+NaoAutenticado -- UC02
+NaoAutenticado -- UC04
+NaoAutenticado -- UC05
+
+' ---- associacoes: motorista ----
+Motorista -- UC03
+Motorista -- UC06
+Motorista -- UC07
+Motorista -- UC16
+Motorista -- UC40
+Motorista -- UC41
+Motorista -- UC43
+Motorista -- UC44
+Motorista -- UC46
+Motorista -- UC47
+Motorista -- UC48
+Motorista -- UC49
+
+' ---- associacoes: gerente ----
+Gerente -- UC03
+Gerente -- UC06
+Gerente -- UC07
+Gerente -- UC08
+Gerente -- UC10
+Gerente -- UC11
+Gerente -- UC12
+Gerente -- UC13
+Gerente -- UC15
+Gerente -- UC16
+Gerente -- UC17
+Gerente -- UC18
+Gerente -- UC19
+Gerente -- UC20
+Gerente -- UC21
+Gerente -- UC22
+Gerente -- UC23
+Gerente -- UC26
+Gerente -- UC28
+Gerente -- UC29
+Gerente -- UC30
+Gerente -- UC32
+Gerente -- UC33
+Gerente -- UC34
+Gerente -- UC35
+Gerente -- UC36
+Gerente -- UC38
+Gerente -- UC39
+Gerente -- UC50
+Gerente -- UC51
+Gerente -- UC52
+Gerente -- UC53
+Gerente -- UC54
+Gerente -- UC55
+Gerente -- UC56
+Gerente -- UC57
+
+' ---- associacoes: administrador ----
+Administrador -- UC09
+Administrador -- UC14
+Administrador -- UC24
+Administrador -- UC37
+@enduml

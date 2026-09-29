@@ -13,7 +13,8 @@
       "!.next",
       "!dist",
       "!build",
-      "!src/server/db/migrations/**/snapshot.json"
+      "!src/server/db/migrations/**/snapshot.json",
+      "!docs/diagrams/svg"
     ]
   },
   "formatter": {
