@@ -17,6 +17,10 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
+import {
+  RemainingRouteActions,
+  StopNavigationActions,
+} from "@/components/modules/driver/stop-navigation-actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -36,6 +40,8 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api/client";
 import { formatTrpcErrorMessage } from "@/lib/api/format-trpc-error";
+import { toNavigationStopInput } from "@/lib/driver-navigation";
+import { buildNavigationLinks } from "@/lib/navigation-links";
 import { stopDwellSeconds } from "@/lib/route-metrics";
 import type { QueuedStopEvent } from "@/lib/sync/sync-client";
 import { useSyncQueue } from "@/lib/sync/use-sync-queue";
@@ -245,6 +251,27 @@ export function DriverDayContent({ driverName }: { driverName: string }) {
     });
   }, [route?.stops, queuedByStopId, route?.status, route]);
 
+  const navigationLinks = useMemo(() => {
+    if (!route) return null;
+    return buildNavigationLinks(
+      route.stops.map((stop) =>
+        toNavigationStopInput(
+          stop,
+          queuedByStopId.get(stop.id)?.departure ?? null,
+        ),
+      ),
+      route.status,
+    );
+  }, [route, queuedByStopId]);
+
+  const perStopLinkById = useMemo(
+    () =>
+      new Map(
+        (navigationLinks?.perStop ?? []).map((link) => [link.stopId, link]),
+      ),
+    [navigationLinks],
+  );
+
   if (isLoadingRoute) {
     return (
       <Card>
@@ -320,6 +347,8 @@ export function DriverDayContent({ driverName }: { driverName: string }) {
     const isInFlight = route.status === "in_flight";
     const opacityClass = isCompleted ? "opacity-60" : "";
     const borderClass = isCurrent ? "border-primary shadow-md border-2" : "";
+    const navigationLink = perStopLinkById.get(stop.id);
+    const showCheckInOut = !origin && !isCompleted;
 
     return (
       <Card
@@ -430,50 +459,59 @@ export function DriverDayContent({ driverName }: { driverName: string }) {
             </div>
           </div>
 
-          {!origin && !isCompleted && (
-            <div
-              className={`flex shrink-0 flex-col sm:flex-row gap-2 mt-2 sm:mt-0 ${isCurrent ? "w-full sm:w-auto" : ""}`}
-            >
-              {!arrival && !departure && (
-                <Button
-                  size={isCurrent ? "default" : "sm"}
-                  className={
-                    isCurrent ? "w-full min-h-[48px] sm:w-auto text-base" : ""
-                  }
-                  disabled={
-                    !isInFlight || (isOnline && checkInMutation.isPending)
-                  }
-                  onClick={() => handleCheckIn(stop.id)}
-                >
-                  <LogIn className="mr-2 size-5" /> Registrar chegada
-                </Button>
-              )}
-              {arrival && !departure && (
-                <Button
-                  size={isCurrent ? "default" : "sm"}
-                  className={
-                    isCurrent ? "w-full min-h-[48px] sm:w-auto text-base" : ""
-                  }
-                  disabled={
-                    !isInFlight ||
-                    (isOnline && !queued && checkOutMutation.isPending)
-                  }
-                  onClick={() => handleCheckOut(stop.id)}
-                >
-                  <LogOut className="mr-2 size-5" /> Registrar saída
-                </Button>
-              )}
-            </div>
-          )}
+          <div
+            className={`flex shrink-0 flex-col gap-3 mt-2 sm:mt-0 sm:items-end ${isCurrent ? "w-full sm:w-auto" : ""}`}
+          >
+            {navigationLink && (
+              <StopNavigationActions
+                googleUrl={navigationLink.googleUrl}
+                wazeUrl={navigationLink.wazeUrl}
+                disabled={navigationLink.disabled}
+                stopLabel={stopTitle(stop)}
+              />
+            )}
 
-          {!origin && isCompleted && (
-            <div className="flex shrink-0 justify-end mt-2 sm:mt-0">
+            {showCheckInOut && (
+              <div className="flex shrink-0 flex-col sm:flex-row gap-2">
+                {!arrival && !departure && (
+                  <Button
+                    size={isCurrent ? "default" : "sm"}
+                    className={
+                      isCurrent ? "w-full min-h-[48px] sm:w-auto text-base" : ""
+                    }
+                    disabled={
+                      !isInFlight || (isOnline && checkInMutation.isPending)
+                    }
+                    onClick={() => handleCheckIn(stop.id)}
+                  >
+                    <LogIn className="mr-2 size-5" /> Registrar chegada
+                  </Button>
+                )}
+                {arrival && !departure && (
+                  <Button
+                    size={isCurrent ? "default" : "sm"}
+                    className={
+                      isCurrent ? "w-full min-h-[48px] sm:w-auto text-base" : ""
+                    }
+                    disabled={
+                      !isInFlight ||
+                      (isOnline && !queued && checkOutMutation.isPending)
+                    }
+                    onClick={() => handleCheckOut(stop.id)}
+                  >
+                    <LogOut className="mr-2 size-5" /> Registrar saída
+                  </Button>
+                )}
+              </div>
+            )}
+
+            {!origin && isCompleted && (
               <span className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-600 dark:text-emerald-400">
                 <CheckCircle2 className="size-5" />
                 {stopPending ? "Concluída (pendente)" : "Concluída"}
               </span>
-            </div>
-          )}
+            )}
+          </div>
         </CardContent>
       </Card>
     );
@@ -624,6 +662,13 @@ export function DriverDayContent({ driverName }: { driverName: string }) {
                   />
                 </div>
               </div>
+            </div>
+          )}
+          {(navigationLinks?.remainingRouteUrls.length ?? 0) > 0 && (
+            <div className="pt-4">
+              <RemainingRouteActions
+                urls={navigationLinks?.remainingRouteUrls ?? []}
+              />
             </div>
           )}
         </CardContent>
