@@ -16,7 +16,11 @@ import {
   routeCostCents,
   toKmHundredths,
 } from "./cost";
-import { createOsrmClient, type OsrmClient } from "./osrm";
+import {
+  createOsrmClient,
+  type OsrmClient,
+  type OsrmRouteGeometry,
+} from "./osrm";
 import type { RoutesRepository } from "./routes.repository";
 import type {
   AddStopInput,
@@ -185,10 +189,18 @@ export class RoutesService {
 
     const totalDwellSeconds = sumDwellSeconds(stopsWithDwell);
 
+    const geometry = await this.computeRouteGeometry(
+      stopsWithDwell.map((s) => ({
+        longitude: s.longitudeSnapshot,
+        latitude: s.latitudeSnapshot,
+      })),
+    );
+
     return this.addPricing({
       ...routeData,
       stops: stopsWithDwell,
       totalDwellSeconds,
+      geometry,
     });
   }
 
@@ -913,6 +925,24 @@ export class RoutesService {
       );
       const totalKm = legs.reduce((sum, leg) => sum + leg, 0);
       return toKmHundredths(totalKm);
+    } catch {
+      return null;
+    }
+  }
+
+  private async computeRouteGeometry(
+    coordinates: CoordinateLike[],
+  ): Promise<OsrmRouteGeometry | null> {
+    if (coordinates.length < 2) {
+      return null;
+    }
+    if (coordinates.some((c) => c.longitude === null || c.latitude === null)) {
+      return null;
+    }
+    try {
+      return await this.osrm.routeGeometry(
+        coordinates as Array<{ longitude: number; latitude: number }>,
+      );
     } catch {
       return null;
     }

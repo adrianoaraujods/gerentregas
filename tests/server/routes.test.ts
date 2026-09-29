@@ -26,7 +26,10 @@ describe("RoutesService", () => {
   let parametersRepository: ParametersRepository;
   let fleetRepository: FleetRepository;
   let mockGeocoder: { geocode: ReturnType<typeof vi.fn> };
-  let mockOsrm: { routeLegDistancesKm: ReturnType<typeof vi.fn> };
+  let mockOsrm: {
+    routeLegDistancesKm: ReturnType<typeof vi.fn>;
+    routeGeometry: ReturnType<typeof vi.fn>;
+  };
   let pointsService: PointsService;
   let routesService: RoutesService;
 
@@ -46,8 +49,10 @@ describe("RoutesService", () => {
     mockGeocoder = { geocode: vi.fn() };
     mockOsrm = {
       routeLegDistancesKm: vi.fn(async () => [5, 7]),
+      routeGeometry: vi.fn(async () => null),
     } as OsrmClient as unknown as {
       routeLegDistancesKm: ReturnType<typeof vi.fn>;
+      routeGeometry: ReturnType<typeof vi.fn>;
     };
     pointsService = new PointsService(
       pointsRepository,
@@ -1290,6 +1295,107 @@ describe("RoutesService", () => {
       expect(mockOsrm.routeLegDistancesKm).not.toHaveBeenCalled();
       expect(result.distanceKm).toBeNull();
       expect(result.cost).toBeNull();
+    });
+  });
+
+  describe("route geometry via single-route read", () => {
+    it("exposes OSRM road geometry on getRoute", async () => {
+      const geometry = {
+        type: "LineString",
+        coordinates: [
+          [-46.6333, -23.5505],
+          [-46.634, -23.551],
+        ],
+      };
+      mockOsrm.routeGeometry.mockResolvedValueOnce(geometry);
+
+      const created = await routesService.createRoute(
+        {
+          driverId,
+          vehicleId: null,
+          date: new Date().toISOString(),
+          stops: [
+            { pointId: pointId1, order: "1" },
+            { pointId: pointId2, order: "2" },
+          ],
+        },
+        managerId,
+      );
+
+      const result = await routesService.getRoute(created.id);
+
+      expect(mockOsrm.routeGeometry).toHaveBeenCalledWith([
+        { longitude: -46.6333, latitude: -23.5505 },
+        { longitude: -46.6333, latitude: -23.5505 },
+      ]);
+      expect(result.geometry).toEqual(geometry);
+      expect(result.stops[0].latitudeSnapshot).toBe(-23.5505);
+    });
+
+    it("degrades gracefully when OSRM geometry fails", async () => {
+      mockOsrm.routeGeometry.mockRejectedValueOnce(new Error("OSRM down"));
+
+      const created = await routesService.createRoute(
+        {
+          driverId,
+          vehicleId: null,
+          date: new Date().toISOString(),
+          stops: [
+            { pointId: pointId1, order: "1" },
+            { pointId: pointId2, order: "2" },
+          ],
+        },
+        managerId,
+      );
+
+      const result = await routesService.getRoute(created.id);
+
+      expect(result.geometry).toBeNull();
+      expect(result.distanceKm).toBe(12);
+    });
+
+    it("returns null geometry for single-stop routes without calling OSRM", async () => {
+      const created = await routesService.createRoute(
+        {
+          driverId,
+          vehicleId: null,
+          date: new Date().toISOString(),
+          stops: [{ pointId: pointId1, order: "1" }],
+        },
+        managerId,
+      );
+
+      const result = await routesService.getRoute(created.id);
+
+      expect(mockOsrm.routeGeometry).not.toHaveBeenCalled();
+      expect(result.geometry).toBeNull();
+    });
+
+    it("returns null geometry when a stop has no coordinates", async () => {
+      mockGeocoder.geocode.mockResolvedValueOnce(null);
+      const ungeocodedPoint = await pointsService.createPoint({
+        name: "Sem coordenadas",
+        address: "Endereço desconhecido, São Paulo, SP",
+      });
+
+      const created = await routesService.createRoute(
+        {
+          driverId,
+          vehicleId: null,
+          date: new Date().toISOString(),
+          stops: [
+            { pointId: pointId1, order: "1" },
+            { pointId: ungeocodedPoint.id, order: "2" },
+          ],
+        },
+        managerId,
+      );
+
+      const result = await routesService.getRoute(created.id);
+
+      expect(mockOsrm.routeGeometry).not.toHaveBeenCalled();
+      expect(result.geometry).toBeNull();
+      expect(result.distanceKm).toBeNull();
     });
   });
 

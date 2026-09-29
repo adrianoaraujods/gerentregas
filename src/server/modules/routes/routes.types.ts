@@ -116,9 +116,18 @@ export const stopWithPointOutputSchema = stopOutputSchema.extend({
 });
 export type StopWithPointOutput = z.infer<typeof stopWithPointOutputSchema>;
 
+export const routeGeometrySchema = z
+  .object({
+    type: z.literal("LineString"),
+    coordinates: z.array(z.tuple([z.number(), z.number()])),
+  })
+  .nullable();
+export type RouteGeometry = z.infer<typeof routeGeometrySchema>;
+
 export const routeWithStopsOutputSchema = routeOutputSchema.extend({
   stops: z.array(stopWithPointOutputSchema),
   totalDwellSeconds: z.number().int().nonnegative().optional(),
+  geometry: routeGeometrySchema.optional(),
 });
 export type RouteWithStopsOutput = z.infer<typeof routeWithStopsOutputSchema>;
 

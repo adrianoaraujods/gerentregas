@@ -17,7 +17,10 @@ describe("History and Corrections", () => {
   let parametersRepository: ParametersRepository;
   let fleetRepository: FleetRepository;
   let mockGeocoder: { geocode: ReturnType<typeof vi.fn> };
-  let mockOsrm: { routeLegDistancesKm: ReturnType<typeof vi.fn> };
+  let mockOsrm: {
+    routeLegDistancesKm: ReturnType<typeof vi.fn>;
+    routeGeometry: ReturnType<typeof vi.fn>;
+  };
   let pointsService: PointsService;
   let routesService: RoutesService;
 
@@ -35,6 +38,7 @@ describe("History and Corrections", () => {
     mockGeocoder = { geocode: vi.fn() };
     mockOsrm = {
       routeLegDistancesKm: vi.fn(async () => [5, 7]),
+      routeGeometry: vi.fn(async () => null),
     };
     pointsService = new PointsService(
       pointsRepository,

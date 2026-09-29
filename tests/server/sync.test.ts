@@ -433,6 +433,7 @@ describe("SyncService", () => {
         new FleetRepository(db),
         {
           routeLegDistancesKm: vi.fn(async () => [5]),
+          routeGeometry: vi.fn(async () => null),
         } as unknown as OsrmClient,
       );
 
