@@ -91,7 +91,7 @@ Regras complementares implementadas no serviço de rotas:
 | RF02 | Autenticar-se com e-mail e senha, com mensagens de erro em português | Alta |
 | RF03 | Encerrar a sessão do usuário autenticado, redirecionando para a tela de entrada | Alta |
 | RF04 | Solicitar o envio de e-mail com link de redefinição de senha para um e-mail cadastrado | Média |
-| RF05 | Redefinir a senha utilizing o token recebido por e-mail, com confirmação da nova senha | Média |
+| RF05 | Redefinir a senha utilizando o token recebido por e-mail, com confirmação da nova senha | Média |
 | RF06 | Consultar o próprio perfil autenticado (nome, e-mail e imagem) | Média |
 | RF07 | Consultar os dados da própria conta e alternar o tema da interface (sistema, claro, escuro) | Baixa |
 | RF08 | Cadastrar motorista com nome, e-mail, senha, telefone em formato E.164 e CPF com 11 dígitos | Alta |
