@@ -48,8 +48,15 @@ export function LoginForm() {
       const callbackUrl = searchParams.get("callbackUrl");
       if (callbackUrl?.startsWith("/") && !callbackUrl.startsWith("//")) {
         router.push(callbackUrl);
+        return;
+      }
+
+      const { data: session } = await authClient.getSession();
+      const role = session?.user?.role;
+      if (role === "admin" || role === "manager") {
+        router.push("/admin");
       } else {
-        router.push("/");
+        router.push("/motorista");
       }
     },
   });
