@@ -79,7 +79,7 @@ export default function ConfiguracoesPage() {
           form.handleSubmit();
         }}
       >
-        <Card className="max-w-md">
+        <Card className="max-w-md animate-in fade-in slide-in-from-bottom-4 duration-500">
           <CardHeader>
             <CardTitle>Configurações</CardTitle>
             <CardDescription>
