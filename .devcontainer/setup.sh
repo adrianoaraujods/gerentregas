@@ -7,16 +7,8 @@ OPENCODE_VERSION="2.1.1"
 
 echo "==> opencode $OPENCODE_VERSION"
 npm uninstall -g opencode-ai >/dev/null 2>&1 || true
-npm install -g "@opencode/cli@${OPENCODE_VERSION}" >/dev/null
+npm install -g "@opencode/cli@${OPENCODE_VERSION}" --no-fund --no-audit
 opencode --version
-
-echo "==> locale"
-if ! locale -a 2>/dev/null | grep -qi "^pt_BR.utf8"; then
-  sudo apt-get update -qq
-  sudo apt-get install -y -qq locales >/dev/null
-  sudo sed -i 's/^# *pt_BR.UTF-8/pt_BR.UTF-8/' /etc/locale.gen
-  sudo locale-gen
-fi
 
 echo "==> dependências"
 pnpm install --frozen-lockfile

@@ -2,10 +2,11 @@
   // Codespaces / Dev Containers do workshop.
   // Cria o ambiente completo: opencode + pnpm + Postgres + banco seedado.
   "name": "gerentregas — workshop",
-  "image": "mcr.microsoft.com/devcontainers/typescript-node:24",
+  // Dockerfile porque o apt precisa de root: o usuário `node` não tem sudo sem senha.
+  "build": { "dockerfile": "Dockerfile" },
   "hostRequirements": { "cpus": 2, "memory": "8gb", "storage": "32gb" },
 
-  // Roda uma vez: instala opencode, dependências, Postgres e banco.
+  // Roda uma vez: instala opencode, dependências e banco.
   "postCreateCommand": "bash .devcontainer/setup.sh",
   // Roda a cada start/resume: garante que o Postgres voltou.
   "postStartCommand": "bash .devcontainer/start.sh",
