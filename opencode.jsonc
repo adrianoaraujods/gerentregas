@@ -1,0 +1,11 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "{env:WORKSHOP_MODEL}",
+  "providers": {
+    "openrouter": {
+      "settings": {
+        "apiKey": "{env:OPENROUTER_API_KEY}"
+      }
+    }
+  }
+}

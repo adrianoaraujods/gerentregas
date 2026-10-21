@@ -3,10 +3,11 @@
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
-OPENCODE_VERSION="1.19.3"
+OPENCODE_VERSION="2.1.1"
 
 echo "==> opencode $OPENCODE_VERSION"
-npm install -g "opencode-ai@${OPENCODE_VERSION}" >/dev/null
+npm uninstall -g opencode-ai >/dev/null 2>&1 || true
+npm install -g "@opencode/cli@${OPENCODE_VERSION}" >/dev/null
 opencode --version
 
 echo "==> locale"
