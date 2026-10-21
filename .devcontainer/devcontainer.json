@@ -1,0 +1,37 @@
+{
+  // Codespaces / Dev Containers do workshop.
+  // Cria o ambiente completo: opencode + pnpm + Postgres + banco seedado.
+  "name": "gerentregas — workshop",
+  "image": "mcr.microsoft.com/devcontainers/typescript-node:24",
+  "hostRequirements": { "cpus": 2, "memory": "8gb", "storage": "32gb" },
+
+  // Roda uma vez: instala opencode, dependências, Postgres e banco.
+  "postCreateCommand": "bash .devcontainer/setup.sh",
+  // Roda a cada start/resume: garante que o Postgres voltou.
+  "postStartCommand": "bash .devcontainer/start.sh",
+
+  "containerEnv": {
+    // PREENCHA AS DUAS LINHAS ANTES DE ABRIR O WORKSHOP.
+    // A chave vai no histórico do git: use uma chave descartável e revogue depois.
+    "OPENROUTER_API_KEY": "COLE_SUA_CHAVE_AQUI",
+    "WORKSHOP_MODEL": "openrouter/COLE_O_MODELO_AQUI",
+
+    // Locale fixo: os testes formatam data e moeda.
+    "LANG": "pt_BR.UTF-8",
+    "TZ": "America/Sao_Paulo"
+  },
+
+  "portsAttributes": {
+    "3000": { "label": "App", "onAutoForward": "notify" }
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": ["biomejs.biome"],
+      "settings": {
+        "editor.formatOnSave": true,
+        "terminal.integrated.defaultProfile.linux": "bash"
+      }
+    }
+  }
+}
