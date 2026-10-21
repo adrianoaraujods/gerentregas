@@ -4,11 +4,18 @@ set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
 OPENCODE_VERSION="1.19.3"
-PGPORT=5433
 
 echo "==> opencode $OPENCODE_VERSION"
 npm install -g "opencode-ai@${OPENCODE_VERSION}" >/dev/null
 opencode --version
+
+echo "==> locale"
+if ! locale -a 2>/dev/null | grep -qi "^pt_BR.utf8"; then
+  sudo apt-get update -qq
+  sudo apt-get install -y -qq locales >/dev/null
+  sudo sed -i 's/^# *pt_BR.UTF-8/pt_BR.UTF-8/' /etc/locale.gen
+  sudo locale-gen
+fi
 
 echo "==> dependências"
 pnpm install --frozen-lockfile
@@ -19,22 +26,8 @@ if [ ! -f .env ]; then
   echo "    .env criado a partir do .env.example — confira DATABASE_URL"
 fi
 
-echo "==> postgres"
-sudo apt-get update -qq
-sudo apt-get install -y -qq postgresql >/dev/null
-PGVER="$(ls /etc/postgresql | sort -V | tail -1)"
-sudo sed -i "s/^port = .*/port = ${PGPORT}/" "/etc/postgresql/${PGVER}/main/postgresql.conf"
-sudo pg_ctlcluster "$PGVER" main start || true
-
-# O global-setup dos testes faz DROP/CREATE DATABASE, então o role precisa de SUPERUSER.
-if ! sudo -u postgres psql -p "$PGPORT" -tAc "SELECT 1 FROM pg_roles WHERE rolname='gerentregas'" | grep -q 1; then
-  sudo -u postgres psql -p "$PGPORT" -c "CREATE ROLE gerentregas LOGIN PASSWORD 'gerentregas' SUPERUSER"
-fi
-if ! sudo -u postgres psql -p "$PGPORT" -tAc "SELECT 1 FROM pg_database WHERE datname='gerentregas'" | grep -q 1; then
-  sudo -u postgres createdb -p "$PGPORT" -O gerentregas gerentregas
-fi
-
-echo "==> schema e seed"
+echo "==> banco"
+bash .devcontainer/start.sh
 pnpm db:push
 pnpm db:seed
 
