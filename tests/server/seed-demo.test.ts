@@ -79,6 +79,27 @@ describe("Demo seed script", () => {
       .from(route)
       .groupBy(route.managerId);
 
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const tomorrowStart = new Date(todayStart);
+    tomorrowStart.setDate(tomorrowStart.getDate() + 1);
+
+    const todayRoutes = await db
+      .select({ status: route.status })
+      .from(route)
+      .where(
+        sql`${route.date} >= ${todayStart.toISOString()} AND ${route.date} < ${tomorrowStart.toISOString()}`,
+      );
+
+    const futureRouteCount = Number(
+      (
+        await db
+          .select({ count: sql<number>`count(*)` })
+          .from(route)
+          .where(sql`${route.date} >= ${tomorrowStart.toISOString()}`)
+      )[0]?.count ?? 0,
+    );
+
     expect(managerCount).toBe(1);
     expect(driverCount).toBe(6);
     expect(pointCount).toBe(18);
@@ -86,10 +107,13 @@ describe("Demo seed script", () => {
     expect(stopCount).toBeGreaterThan(200);
     expect(stopsWithDepartureAt).toBeGreaterThan(100);
     expect(statusMap.concluded).toBeGreaterThan(50);
-    expect(statusMap.in_flight).toBeGreaterThan(5);
-    expect(statusMap.draft).toBeGreaterThan(5);
+    expect(statusMap.in_flight).toBeGreaterThan(0);
     expect(statusMap.cancelled).toBeGreaterThan(0);
     expect(managerCounts.length).toBe(1);
     expect(Number(managerCounts[0].count)).toBeGreaterThan(50);
+
+    expect(todayRoutes.length).toBeGreaterThan(0);
+    expect(todayRoutes.every((r) => r.status === "in_flight")).toBe(true);
+    expect(futureRouteCount).toBe(0);
   });
 });

@@ -138,18 +138,12 @@ const BH_POINTS = [
 
 type RouteStatus = "concluded" | "in_flight" | "draft" | "cancelled";
 
-const ROUTE_STATUSES: RouteStatus[] = [
-  "concluded",
-  "in_flight",
-  "draft",
-  "cancelled",
-];
-const STATUS_WEIGHTS = [70, 15, 10, 5];
+const DAYS_BACK = 90;
 
-function _randomDateInRange(start: Date, end: Date): Date {
-  return new Date(
-    start.getTime() + Math.random() * (end.getTime() - start.getTime()),
-  );
+function addDays(date: Date, days: number): Date {
+  const result = new Date(date);
+  result.setDate(result.getDate() + days);
+  return result;
 }
 
 function isWeekday(date: Date): boolean {
@@ -272,20 +266,17 @@ export async function main() {
     console.log(`   Point created: ${pt.name} (${pt.address})`);
   }
 
-  console.log("🛣️  Generating routes for last 3 months...");
-  const endDate = new Date();
-  endDate.setHours(23, 59, 59, 999);
-  const startDate = new Date();
-  startDate.setMonth(startDate.getMonth() - 3);
-  startDate.setHours(0, 0, 0, 0);
+  console.log("🛣️  Generating routes for the last 90 days...");
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
 
-  const workingDays: Date[] = [];
-  for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-    if (isWeekday(d)) {
-      workingDays.push(new Date(d));
+  const dayOffsets: number[] = [];
+  for (let offset = -DAYS_BACK; offset <= 0; offset++) {
+    if (offset === 0 || isWeekday(addDays(today, offset))) {
+      dayOffsets.push(offset);
     }
   }
-  console.log(`   Found ${workingDays.length} working days in range`);
+  console.log(`   Found ${dayOffsets.length} working days in range`);
 
   const routesCreated: Array<{
     id: string;
@@ -294,17 +285,33 @@ export async function main() {
     status: string;
   }> = [];
 
-  for (const day of workingDays) {
+  for (const offset of dayOffsets) {
+    const day = addDays(today, offset);
     const shuffledDrivers = shuffle(driverIds);
     const routesPerDay = Math.floor(Math.random() * 3) + 1;
 
     for (let i = 0; i < routesPerDay && i < shuffledDrivers.length; i++) {
       const driverId = shuffledDrivers[i];
-      const status = pickWeighted<RouteStatus>(ROUTE_STATUSES, STATUS_WEIGHTS);
+      const status: RouteStatus =
+        offset === 0
+          ? "in_flight"
+          : pickWeighted<RouteStatus>(["concluded", "cancelled"], [92, 8]);
       const routeId = crypto.randomUUID();
 
-      const routeDate = new Date(day);
-      routeDate.setHours(8, Math.floor(Math.random() * 60), 0, 0);
+      const minutesAgo = 60 + Math.floor(Math.random() * 121);
+      // Clamp to today so seeding just after midnight can't date the route yesterday.
+      const routeDate =
+        offset === 0
+          ? new Date(
+              Math.max(
+                today.getTime() + 60000,
+                Date.now() - minutesAgo * 60000,
+              ),
+            )
+          : new Date(day);
+      if (offset !== 0) {
+        routeDate.setHours(8, Math.floor(Math.random() * 60), 0, 0);
+      }
 
       await db.insert(route).values({
         id: routeId,
@@ -466,7 +473,7 @@ export async function main() {
   console.log(`   Routes: ${routesCreated.length}`);
   console.log(`   Stops: ${totalStops}`);
   console.log(
-    `   Date range: ${startDate.toISOString().split("T")[0]} to ${endDate.toISOString().split("T")[0]}`,
+    `   Date range: ${addDays(today, dayOffsets[0]).toISOString().split("T")[0]} to ${today.toISOString().split("T")[0]}`,
   );
 }
 
