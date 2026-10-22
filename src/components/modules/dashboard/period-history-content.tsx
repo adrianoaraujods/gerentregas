@@ -192,7 +192,7 @@ export function PeriodHistoryContent({
         </div>
 
         <Card>
-          <CardContent className="pt-0">
+          <CardContent>
             <DataTable
               table={table}
               toolbarProps={{ searchPlaceholder: "Pesquisar paradas..." }}

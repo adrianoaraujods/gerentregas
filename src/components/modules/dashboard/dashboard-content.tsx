@@ -366,7 +366,7 @@ export function DashboardContent() {
       </div>
 
       <Card>
-        <CardContent className="pt-6">
+        <CardContent className="">
           <PeriodSelector
             periodType={periodType}
             onPeriodTypeChange={setPeriodType}
