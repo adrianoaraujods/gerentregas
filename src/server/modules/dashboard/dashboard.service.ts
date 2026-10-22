@@ -1,4 +1,7 @@
-import { workdayPercentage as computeWorkdayPercentage } from "@/lib/route-metrics";
+import {
+  averageDwellPerRoute,
+  workdayPercentage as computeWorkdayPercentage,
+} from "@/lib/route-metrics";
 import { NotFoundError } from "@/server/api";
 import type { DashboardRepository } from "./dashboard.repository";
 import type {
@@ -30,7 +33,7 @@ export class DashboardService {
           "Data é obrigatória para visualização por dia.",
         );
       }
-      const { stops, totalDwellMinutes } =
+      const { stops, totalDwellMinutes, driverCount, routeCount } =
         await this.repository.getDayTimeline(date);
 
       const enrichedStops: DayTimelineStop[] = stops.map((s) => ({
@@ -43,8 +46,13 @@ export class DashboardService {
         ),
       }));
 
-      const workdayPercentage = computeWorkdayPercentage(
+      const averageDwellMinutes = averageDwellPerRoute(
         totalDwellMinutes,
+        routeCount,
+      );
+
+      const workdayPercentage = computeWorkdayPercentage(
+        averageDwellMinutes,
         workdayMinutes,
       );
 
@@ -52,7 +60,9 @@ export class DashboardService {
         periodType: "day",
         date: date.toISOString(),
         stops: enrichedStops,
+        driverCount,
         totalDwellMinutes,
+        averageDwellMinutes,
         workdayPercentage,
       };
     }
@@ -63,7 +73,7 @@ export class DashboardService {
           "Ano e mês são obrigatórios para visualização por mês.",
         );
       }
-      const { days, totalDwellMinutes } =
+      const { days, totalDwellMinutes, driverCount, routeCount } =
         await this.repository.getMonthAggregation(input.year, input.month);
 
       const enrichedDays: DailyAggregation[] = days.map((d) => ({
@@ -71,13 +81,18 @@ export class DashboardService {
         totalDwellMinutes: d.totalDwellMinutes,
         stopsCount: d.stopsCount,
         workdayPercentage: computeWorkdayPercentage(
-          d.totalDwellMinutes,
+          averageDwellPerRoute(d.totalDwellMinutes, d.routeCount),
           workdayMinutes,
         ),
       }));
 
-      const workdayPercentage = computeWorkdayPercentage(
+      const averageDwellMinutes = averageDwellPerRoute(
         totalDwellMinutes,
+        routeCount,
+      );
+
+      const workdayPercentage = computeWorkdayPercentage(
+        averageDwellMinutes,
         workdayMinutes,
       );
 
@@ -86,7 +101,9 @@ export class DashboardService {
         year: input.year,
         month: input.month,
         days: enrichedDays,
+        driverCount,
         totalDwellMinutes,
+        averageDwellMinutes,
         workdayPercentage,
       };
     }
@@ -99,7 +116,7 @@ export class DashboardService {
           "Data inicial e final são obrigatórias para período personalizado.",
         );
       }
-      const { days, totalDwellMinutes } =
+      const { days, totalDwellMinutes, driverCount, routeCount } =
         await this.repository.getCustomAggregation(dateFrom, dateTo);
 
       const enrichedDays: DailyAggregation[] = days.map((d) => ({
@@ -107,13 +124,18 @@ export class DashboardService {
         totalDwellMinutes: d.totalDwellMinutes,
         stopsCount: d.stopsCount,
         workdayPercentage: computeWorkdayPercentage(
-          d.totalDwellMinutes,
+          averageDwellPerRoute(d.totalDwellMinutes, d.routeCount),
           workdayMinutes,
         ),
       }));
 
-      const workdayPercentage = computeWorkdayPercentage(
+      const averageDwellMinutes = averageDwellPerRoute(
         totalDwellMinutes,
+        routeCount,
+      );
+
+      const workdayPercentage = computeWorkdayPercentage(
+        averageDwellMinutes,
         workdayMinutes,
       );
 
@@ -122,7 +144,9 @@ export class DashboardService {
         dateFrom: dateFrom.toISOString(),
         dateTo: dateTo.toISOString(),
         days: enrichedDays,
+        driverCount,
         totalDwellMinutes,
+        averageDwellMinutes,
         workdayPercentage,
       };
     }
@@ -140,7 +164,7 @@ export class DashboardService {
       dateTo: toDate(input.dateTo),
     };
 
-    const { stops, totalDwellMinutes } =
+    const { stops, totalDwellMinutes, driverCount, routeCount } =
       await this.repository.getDrilldown(drilldownInput);
 
     const enrichedStops: DrilldownStop[] = stops.map((s) => ({
@@ -153,14 +177,21 @@ export class DashboardService {
       ),
     }));
 
-    const workdayPercentage = computeWorkdayPercentage(
+    const averageDwellMinutes = averageDwellPerRoute(
       totalDwellMinutes,
+      routeCount,
+    );
+
+    const workdayPercentage = computeWorkdayPercentage(
+      averageDwellMinutes,
       workdayMinutes,
     );
 
     return {
       stops: enrichedStops,
+      driverCount,
       totalDwellMinutes,
+      averageDwellMinutes,
       workdayPercentage,
     };
   }

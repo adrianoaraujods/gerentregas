@@ -44,6 +44,10 @@ _Avoid_: concluded_at, finished flag, flag de conclusão
 8 hours per day. Used as the denominator for dwell time percentage indicators.
 _Avoid_: shift, work period
 
+**Average dwell per driver-day** (Média de tempo parado por motorista-dia):
+The dashboard's headline dwell indicator for a period: total dwell time divided by the number of routes in that period (one route = one driver's working day). A route without concluded stops still counts and contributes zero. The chart tooltip uses the same rule scoped to that day. Dwell percentages divide this average by the standard workday, so 100% means every driver stayed stopped for the whole shift, whatever the period length. Driver counts shown separately are distinct drivers, not routes.
+_Avoid_: average total, per-driver monthly total
+
 **Route metrics** (Métricas do roteiro):
 The dwell-derived quantities of a Route — per-stop dwell time (Origin excluded), route total dwell, and dwell percentage of the standard workday — computed by one shared module (`src/lib/route-metrics`). The dashboard's month views keep a SQL aggregation, pinned equivalent by test. Route cost keeps its own home in the Route module.
 _Avoid_: dwell engine, statistics service
@@ -84,6 +88,7 @@ _Avoid_: sync engine, offline manager
 - RN07: Route cost = distance × (fuel price / vehicle km per liter); distance from OSRM routing
 - RN08: Deleting a vehicle or user with route history archives it; without history it is permanently deleted
 - RN09: Archived users are banned at sign-in (sessions revoked on archive)
+- RN10: Period dwell indicators use the average per driver-day: average dwell = total dwell ÷ number of routes in the period (route without concluded stops counts 0); dwell percentage = average dwell ÷ standard workday (100% = every driver stopped the whole shift)
 
 ## 4. UI Guidelines
 

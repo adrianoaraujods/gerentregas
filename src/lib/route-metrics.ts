@@ -33,6 +33,14 @@ export function workdayPercentage(
   return (dwell / standardWorkday) * 100;
 }
 
+export function averageDwellPerRoute(
+  totalDwellMinutes: number,
+  routeCount: number,
+): number {
+  if (routeCount <= 0) return 0;
+  return totalDwellMinutes / routeCount;
+}
+
 export function formatDwellSeconds(
   seconds: number | null | undefined,
 ): string | null {

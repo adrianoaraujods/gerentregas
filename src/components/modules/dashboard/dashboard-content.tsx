@@ -65,6 +65,8 @@ interface DashboardData {
   stops?: DashboardStop[];
   days?: DashboardDay[];
   totalDwellMinutes: number;
+  averageDwellMinutes: number;
+  driverCount: number;
   workdayPercentage: number;
 }
 
@@ -84,8 +86,9 @@ export function DashboardContent() {
   const [drilldownStops, setDrilldownStops] = React.useState<DrilldownStop[]>(
     [],
   );
-  const [drilldownTotal, setDrilldownTotal] = React.useState(0);
+  const [drilldownAverage, setDrilldownAverage] = React.useState(0);
   const [drilldownWorkdayPct, setDrilldownWorkdayPct] = React.useState(0);
+  const [drilldownDriverCount, setDrilldownDriverCount] = React.useState(0);
   const [workdayMinutes, setWorkdayMinutes] = React.useState(480);
 
   const utils = api.useUtils();
@@ -155,7 +158,8 @@ export function DashboardContent() {
     try {
       const data = await promise;
       setDrilldownStops(data.stops);
-      setDrilldownTotal(data.totalDwellMinutes);
+      setDrilldownAverage(data.averageDwellMinutes);
+      setDrilldownDriverCount(data.driverCount);
       setDrilldownWorkdayPct(data.workdayPercentage);
       setDrilldownTitle(
         `Detalhes do dia ${format(
@@ -284,22 +288,23 @@ export function DashboardContent() {
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium">
-                Tempo Total Parado
+                Tempo Parado Médio
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold tabular-nums">
-                {(aggregation.totalDwellMinutes / 60).toFixed(1)}h
+                {(aggregation.averageDwellMinutes / 60).toFixed(1)}h
               </div>
               <p className="text-sm text-muted-foreground">
-                {aggregation.totalDwellMinutes} minutos
+                por motorista/dia ·{" "}
+                {Math.round(aggregation.averageDwellMinutes)} minutos
               </p>
             </CardContent>
           </Card>
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium">
-                % da Jornada Padrão
+                % Média da Jornada Padrão
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -328,6 +333,10 @@ export function DashboardContent() {
                       .length || 0
                   : aggregation.days?.length || 0}
               </div>
+              <p className="text-sm text-muted-foreground">
+                {aggregation.driverCount}{" "}
+                {aggregation.driverCount === 1 ? "motorista" : "motoristas"}
+              </p>
             </CardContent>
           </Card>
         </div>
@@ -378,7 +387,8 @@ export function DashboardContent() {
         onOpenChange={setDrilldownOpen}
         title={drilldownTitle}
         stops={drilldownStops}
-        totalDwellMinutes={drilldownTotal}
+        averageDwellMinutes={drilldownAverage}
+        driverCount={drilldownDriverCount}
         workdayPercentage={drilldownWorkdayPct}
         onExportCSV={handleCsvExport}
       />

@@ -59,7 +59,9 @@ export const aggregationOutputSchema = z.discriminatedUnion("periodType", [
     periodType: z.literal("day"),
     date: z.iso.datetime({ local: true }),
     stops: z.array(dayTimelineStopSchema),
+    driverCount: z.number().int().nonnegative(),
     totalDwellMinutes: z.number().nonnegative(),
+    averageDwellMinutes: z.number().nonnegative(),
     workdayPercentage: z.number().nonnegative(),
   }),
   z.object({
@@ -67,7 +69,9 @@ export const aggregationOutputSchema = z.discriminatedUnion("periodType", [
     year: z.number().int(),
     month: z.number().int().min(1).max(12),
     days: z.array(dailyAggregationSchema),
+    driverCount: z.number().int().nonnegative(),
     totalDwellMinutes: z.number().nonnegative(),
+    averageDwellMinutes: z.number().nonnegative(),
     workdayPercentage: z.number().nonnegative(),
   }),
   z.object({
@@ -75,7 +79,9 @@ export const aggregationOutputSchema = z.discriminatedUnion("periodType", [
     dateFrom: z.iso.datetime({ local: true }),
     dateTo: z.iso.datetime({ local: true }),
     days: z.array(dailyAggregationSchema),
+    driverCount: z.number().int().nonnegative(),
     totalDwellMinutes: z.number().nonnegative(),
+    averageDwellMinutes: z.number().nonnegative(),
     workdayPercentage: z.number().nonnegative(),
   }),
 ]);
@@ -109,7 +115,9 @@ export type DrilldownStop = z.infer<typeof drilldownStopSchema>;
 
 export const drilldownOutputSchema = z.object({
   stops: z.array(drilldownStopSchema),
+  driverCount: z.number().int().nonnegative(),
   totalDwellMinutes: z.number().nonnegative(),
+  averageDwellMinutes: z.number().nonnegative(),
   workdayPercentage: z.number().nonnegative(),
 });
 export type DrilldownOutput = z.infer<typeof drilldownOutputSchema>;

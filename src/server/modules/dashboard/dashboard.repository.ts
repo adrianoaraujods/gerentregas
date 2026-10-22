@@ -45,6 +45,8 @@ export class DashboardRepository {
       dwellHours: number;
     }>;
     totalDwellMinutes: number;
+    driverCount: number;
+    routeCount: number;
   }> {
     const startOfDay = new Date(date);
     startOfDay.setHours(0, 0, 0, 0);
@@ -54,16 +56,15 @@ export class DashboardRepository {
     const routesForDay = await this.db
       .select({ id: route.id, driverId: route.driverId })
       .from(route)
-      .where(
-        and(
-          sql`${route.date} >= ${startOfDay.toISOString()}`,
-          sql`${route.date} <= ${endOfDay.toISOString()}`,
-          isNull(route.deletedAt),
-        ),
-      );
+      .where(this.routeRangeFilter(startOfDay, endOfDay));
 
     if (routesForDay.length === 0) {
-      return { stops: [], totalDwellMinutes: 0 };
+      return {
+        stops: [],
+        totalDwellMinutes: 0,
+        driverCount: 0,
+        routeCount: 0,
+      };
     }
 
     const routeIds = routesForDay.map((r) => r.id);
@@ -137,7 +138,20 @@ export class DashboardRepository {
       }
     }
 
-    return { stops: result, totalDwellMinutes };
+    return {
+      stops: result,
+      totalDwellMinutes,
+      driverCount: new Set(routesForDay.map((r) => r.driverId)).size,
+      routeCount: routesForDay.length,
+    };
+  }
+
+  private routeRangeFilter(startDate: Date, endDate: Date) {
+    return and(
+      sql`${route.date} >= ${startDate.toISOString()}`,
+      sql`${route.date} <= ${endDate.toISOString()}`,
+      isNull(route.deletedAt),
+    );
   }
 
   private async getDailyAggregation(
@@ -148,6 +162,7 @@ export class DashboardRepository {
       date: Date;
       totalDwellMinutes: number;
       stopsCount: number;
+      routeCount: number;
     }>
   > {
     const dailyData = await this.db.execute(sql`
@@ -176,17 +191,51 @@ export class DashboardRepository {
           COUNT(*) as stops_count
         FROM stop_dwell
         GROUP BY date
+      ),
+      daily_routes AS (
+        SELECT
+          DATE(${route.date} AT TIME ZONE 'UTC') as date,
+          COUNT(*) as route_count
+        FROM ${route}
+        WHERE ${route.date} >= ${startDate.toISOString()}
+          AND ${route.date} <= ${endDate.toISOString()}
+          AND ${route.deletedAt} IS NULL
+        GROUP BY DATE(${route.date} AT TIME ZONE 'UTC')
       )
-      SELECT date, COALESCE(total_dwell_minutes, 0) as total_dwell_minutes, COALESCE(stops_count, 0) as stops_count
-      FROM daily_dwell
-      ORDER BY date
+      SELECT
+        d.date,
+        COALESCE(d.total_dwell_minutes, 0) as total_dwell_minutes,
+        COALESCE(d.stops_count, 0) as stops_count,
+        COALESCE(dr.route_count, 0) as route_count
+      FROM daily_dwell d
+      LEFT JOIN daily_routes dr ON dr.date = d.date
+      ORDER BY d.date
     `);
 
     return dailyData.rows.map((row: Record<string, unknown>) => ({
       date: new Date(row.date as string),
       totalDwellMinutes: Number(row.total_dwell_minutes) || 0,
       stopsCount: Number(row.stops_count) || 0,
+      routeCount: Number(row.route_count) || 0,
     }));
+  }
+
+  private async getRouteStats(
+    startDate: Date,
+    endDate: Date,
+  ): Promise<{ driverCount: number; routeCount: number }> {
+    const [row] = await this.db
+      .select({
+        driverCount: sql<number>`COUNT(DISTINCT ${route.driverId})`,
+        routeCount: sql<number>`COUNT(*)`,
+      })
+      .from(route)
+      .where(this.routeRangeFilter(startDate, endDate));
+
+    return {
+      driverCount: Number(row?.driverCount ?? 0),
+      routeCount: Number(row?.routeCount ?? 0),
+    };
   }
 
   async getMonthAggregation(
@@ -197,8 +246,11 @@ export class DashboardRepository {
       date: Date;
       totalDwellMinutes: number;
       stopsCount: number;
+      routeCount: number;
     }>;
     totalDwellMinutes: number;
+    driverCount: number;
+    routeCount: number;
   }> {
     const startOfMonth = new Date(Date.UTC(year, month - 1, 1));
     const endOfMonth = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999));
@@ -210,7 +262,12 @@ export class DashboardRepository {
       0,
     );
 
-    return { days, totalDwellMinutes };
+    const { driverCount, routeCount } = await this.getRouteStats(
+      startOfMonth,
+      endOfMonth,
+    );
+
+    return { days, totalDwellMinutes, driverCount, routeCount };
   }
 
   async getCustomAggregation(
@@ -221,8 +278,11 @@ export class DashboardRepository {
       date: Date;
       totalDwellMinutes: number;
       stopsCount: number;
+      routeCount: number;
     }>;
     totalDwellMinutes: number;
+    driverCount: number;
+    routeCount: number;
   }> {
     const startDate = new Date(dateFrom);
     startDate.setHours(0, 0, 0, 0);
@@ -236,7 +296,12 @@ export class DashboardRepository {
       0,
     );
 
-    return { days, totalDwellMinutes };
+    const { driverCount, routeCount } = await this.getRouteStats(
+      startDate,
+      endDate,
+    );
+
+    return { days, totalDwellMinutes, driverCount, routeCount };
   }
 
   async getDrilldown(input: {
@@ -261,6 +326,8 @@ export class DashboardRepository {
       dwellMinutes: number;
     }>;
     totalDwellMinutes: number;
+    driverCount: number;
+    routeCount: number;
   }> {
     let startDate: Date;
     let endDate: Date;
@@ -283,7 +350,7 @@ export class DashboardRepository {
       endDate = new Date(input.dateTo);
       endDate.setHours(23, 59, 59, 999);
     } else {
-      return { stops: [], totalDwellMinutes: 0 };
+      return { stops: [], totalDwellMinutes: 0, driverCount: 0, routeCount: 0 };
     }
 
     const routesInPeriod = await this.db
@@ -295,16 +362,10 @@ export class DashboardRepository {
       })
       .from(route)
       .leftJoin(user, eq(route.driverId, user.id))
-      .where(
-        and(
-          sql`${route.date} >= ${startDate.toISOString()}`,
-          sql`${route.date} <= ${endDate.toISOString()}`,
-          isNull(route.deletedAt),
-        ),
-      );
+      .where(this.routeRangeFilter(startDate, endDate));
 
     if (routesInPeriod.length === 0) {
-      return { stops: [], totalDwellMinutes: 0 };
+      return { stops: [], totalDwellMinutes: 0, driverCount: 0, routeCount: 0 };
     }
 
     const routeIds = routesInPeriod.map((r) => r.routeId);
@@ -384,7 +445,12 @@ export class DashboardRepository {
       }
     }
 
-    return { stops: result, totalDwellMinutes };
+    return {
+      stops: result,
+      totalDwellMinutes,
+      driverCount: new Set(routesInPeriod.map((r) => r.driverId)).size,
+      routeCount: routesInPeriod.length,
+    };
   }
 
   async exportCSV(input: {

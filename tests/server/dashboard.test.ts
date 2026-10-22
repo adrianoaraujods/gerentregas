@@ -28,6 +28,73 @@ function isCustomAggregation(
   return result.periodType === "custom";
 }
 
+async function addDriverWithDwell(
+  managerId: string,
+  date: Date,
+  originPointId: string,
+  plan: Array<{ pointId: string; dwellMinutes: number }>,
+  status: "concluded" | "in_flight" = "concluded",
+  driverId?: string,
+): Promise<string> {
+  const id = driverId ?? crypto.randomUUID();
+
+  if (!driverId) {
+    await db.insert(user).values({
+      id,
+      name: `Driver ${id.slice(0, 8)}`,
+      email: `${id}@test.com`,
+      emailVerified: true,
+      role: "driver",
+      document: encrypt(id.replace(/\D/g, "").padEnd(11, "0").slice(0, 11)),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+  }
+
+  const [insertedRoute] = await db
+    .insert(route)
+    .values({
+      managerId,
+      driverId: id,
+      vehicleId: null,
+      date,
+      status,
+      currentVersion: "1",
+    })
+    .returning({ id: route.id });
+
+  if (plan.length > 0) {
+    const baseTime = new Date(date);
+    baseTime.setHours(8, 0, 0, 0);
+
+    await db.insert(stop).values([
+      {
+        routeId: insertedRoute.id,
+        pointId: originPointId,
+        order: "1",
+        addressSnapshot: "Origem",
+        latitudeSnapshot: -23.5505,
+        longitudeSnapshot: -46.6333,
+        departureAt: new Date(baseTime.getTime() + 15 * 60000),
+      },
+      ...plan.map((p, index) => ({
+        routeId: insertedRoute.id,
+        pointId: p.pointId,
+        order: String(index + 2),
+        addressSnapshot: "Endereço",
+        latitudeSnapshot: -23.5515,
+        longitudeSnapshot: -46.6343,
+        arrivalAt: new Date(baseTime.getTime() + 30 * 60000),
+        departureAt: new Date(
+          baseTime.getTime() + (30 + p.dwellMinutes) * 60000,
+        ),
+      })),
+    ]);
+  }
+
+  return id;
+}
+
 describe("DashboardService", () => {
   let dashboardRepository: DashboardRepository;
   let dashboardService: DashboardService;
@@ -191,6 +258,33 @@ describe("DashboardService", () => {
       expect(result.workdayPercentage).toBe(25);
     });
 
+    it("averages dwell per driver, counting drivers without completed stops (RN10)", async () => {
+      const testDate = new Date();
+      testDate.setHours(8, 0, 0, 0);
+
+      await addDriverWithDwell(managerId, testDate, pointId1, [
+        { pointId: pointId2, dwellMinutes: 60 },
+      ]);
+      await addDriverWithDwell(managerId, testDate, pointId1, [], "in_flight");
+
+      const queryDate = new Date();
+      queryDate.setHours(0, 0, 0, 0);
+
+      const result = await dashboardService.getAggregation({
+        periodType: "day",
+        date: queryDate.toISOString(),
+      });
+
+      expect(isDayAggregation(result)).toBe(true);
+      if (!isDayAggregation(result)) return;
+
+      // 120 (driver 1) + 60 (driver 2) + 0 (driver 3, roteiro sem paradas concluídas)
+      expect(result.totalDwellMinutes).toBe(180);
+      expect(result.driverCount).toBe(3);
+      expect(result.averageDwellMinutes).toBe(60);
+      expect(result.workdayPercentage).toBe(12.5);
+    });
+
     it("returns empty data for day with no routes", async () => {
       const futureDate = new Date();
       futureDate.setFullYear(futureDate.getFullYear() + 10);
@@ -231,9 +325,106 @@ describe("DashboardService", () => {
       expect(result.totalDwellMinutes).toBe(120);
       expect(result.workdayPercentage).toBe(25);
     });
+    it("averages dwell per driver-day (route), not per distinct driver (RN10)", async () => {
+      const testDate = new Date();
+      testDate.setHours(8, 0, 0, 0);
+      const otherDay = new Date(
+        testDate.getFullYear(),
+        testDate.getMonth(),
+        testDate.getDate() === 10 ? 11 : 10,
+        8,
+        0,
+        0,
+      );
+
+      await addDriverWithDwell(
+        managerId,
+        new Date(
+          testDate.getFullYear(),
+          testDate.getMonth(),
+          testDate.getDate(),
+          9,
+          30,
+        ),
+        pointId1,
+        [{ pointId: pointId2, dwellMinutes: 60 }],
+      );
+      await addDriverWithDwell(
+        managerId,
+        new Date(
+          testDate.getFullYear(),
+          testDate.getMonth(),
+          testDate.getDate(),
+          10,
+          15,
+        ),
+        pointId1,
+        [],
+        "in_flight",
+      );
+      // Same driver on a second day: 2 routes, still 1 distinct driver
+      await addDriverWithDwell(
+        managerId,
+        otherDay,
+        pointId1,
+        [{ pointId: pointId2, dwellMinutes: 120 }],
+        "concluded",
+        driverId,
+      );
+
+      const result = await dashboardService.getAggregation({
+        periodType: "month",
+        year: testDate.getFullYear(),
+        month: testDate.getMonth() + 1,
+      });
+
+      expect(isMonthAggregation(result)).toBe(true);
+      if (!isMonthAggregation(result)) return;
+
+      // 120 (dia 1) + 60 + 0 + 120 (dia 2) = 300 em 4 roteiros / 3 motoristas
+      expect(result.totalDwellMinutes).toBe(300);
+      expect(result.driverCount).toBe(3);
+      expect(result.averageDwellMinutes).toBe(75);
+      expect(result.workdayPercentage).toBe(15.625);
+      expect(result.days).toHaveLength(2);
+
+      const busyDay = result.days.find((d) => d.totalDwellMinutes === 180);
+      const lightDay = result.days.find((d) => d.totalDwellMinutes === 120);
+      expect(busyDay?.workdayPercentage).toBe(12.5); // 180 ÷ 3 roteiros
+      expect(lightDay?.workdayPercentage).toBe(25); // 120 ÷ 1 roteiro
+    });
   });
 
   describe("getAggregation - custom", () => {
+    it("averages dwell per driver-day across the range (RN10)", async () => {
+      const testDate = new Date();
+      testDate.setHours(8, 0, 0, 0);
+
+      await addDriverWithDwell(managerId, testDate, pointId1, [
+        { pointId: pointId2, dwellMinutes: 60 },
+      ]);
+      await addDriverWithDwell(managerId, testDate, pointId1, [], "in_flight");
+
+      const dateFrom = new Date(testDate);
+      dateFrom.setDate(dateFrom.getDate() - 1);
+      const dateTo = new Date(testDate);
+
+      const result = await dashboardService.getAggregation({
+        periodType: "custom",
+        dateFrom: dateFrom.toISOString(),
+        dateTo: dateTo.toISOString(),
+      });
+
+      expect(isCustomAggregation(result)).toBe(true);
+      if (!isCustomAggregation(result)) return;
+
+      // 120 (motorista 1) + 60 (motorista 2) + 0 (roteiro sem paradas) em 3 roteiros
+      expect(result.totalDwellMinutes).toBe(180);
+      expect(result.driverCount).toBe(3);
+      expect(result.averageDwellMinutes).toBe(60);
+      expect(result.workdayPercentage).toBe(12.5);
+    });
+
     it("returns daily aggregations for a custom period", async () => {
       const dateFrom = new Date();
       dateFrom.setMonth(dateFrom.getMonth() - 1);
@@ -258,6 +449,30 @@ describe("DashboardService", () => {
   });
 
   describe("getDrilldown", () => {
+    it("averages drilldown dwell per driver (RN10)", async () => {
+      const testDate = new Date();
+      testDate.setHours(8, 0, 0, 0);
+
+      await addDriverWithDwell(managerId, testDate, pointId1, [
+        { pointId: pointId2, dwellMinutes: 30 },
+      ]);
+
+      const queryDate = new Date();
+      queryDate.setHours(0, 0, 0, 0);
+
+      const result = await dashboardService.getDrilldown({
+        periodType: "day",
+        date: queryDate.toISOString(),
+      });
+
+      // 120 (motorista 1) + 30 (motorista 2)
+      expect(result.stops.length).toBe(3);
+      expect(result.totalDwellMinutes).toBe(150);
+      expect(result.driverCount).toBe(2);
+      expect(result.averageDwellMinutes).toBe(75);
+      expect(result.workdayPercentage).toBe(15.625);
+    });
+
     it("returns detailed stops for a day", async () => {
       const testDate = new Date();
       testDate.setHours(0, 0, 0, 0);

@@ -17,7 +17,8 @@ interface DrilldownModalProps {
   onOpenChange: (open: boolean) => void;
   title: string;
   stops: DrilldownStop[];
-  totalDwellMinutes: number;
+  averageDwellMinutes: number;
+  driverCount: number;
   workdayPercentage: number;
   onExportCSV?: () => void;
 }
@@ -27,7 +28,8 @@ export function DrilldownModal({
   onOpenChange,
   title,
   stops,
-  totalDwellMinutes,
+  averageDwellMinutes,
+  driverCount,
   workdayPercentage,
   onExportCSV,
 }: DrilldownModalProps) {
@@ -45,7 +47,9 @@ export function DrilldownModal({
             <div>
               <DialogTitle>{title}</DialogTitle>
               <DialogDescription>
-                {stops.length} parada(s) • {totalDwellMinutes} min total •{" "}
+                {stops.length} parada(s) • média de{" "}
+                {Math.round(averageDwellMinutes)} min por motorista •{" "}
+                {driverCount} {driverCount === 1 ? "motorista" : "motoristas"} •{" "}
                 {workdayPercentage.toFixed(1)}% da jornada
               </DialogDescription>
             </div>

@@ -17,7 +17,6 @@ import {
   YAxis,
 } from "recharts";
 import { useIsMobile } from "@/components/hooks/use-mobile";
-import { cn } from "@/lib/utils";
 
 interface DailyAggregation {
   date: string;
@@ -61,15 +60,13 @@ export function MonthBarChart({
     );
   }
 
-  const chartData = data.map((d, index) => {
+  const chartData = data.map((d) => {
     const dwellHoursNum = Number((d.totalDwellMinutes / 60).toFixed(2));
     return {
       ...d,
       label: formatShortDate(d.date),
       dwellHours: dwellHoursNum.toFixed(1),
       dwellHoursNum,
-      color: `var(--chart-${(index % 5) + 1})`,
-      index,
     };
   });
 
@@ -107,7 +104,7 @@ export function MonthBarChart({
           </span>
           <span className="text-muted-foreground">Paradas:</span>
           <span className="font-medium">{item.stopsCount}</span>
-          <span className="text-muted-foreground">% Jornada:</span>
+          <span className="text-muted-foreground">% Jornada (média):</span>
           <span className="font-medium">
             {item.workdayPercentage.toFixed(1)}%
           </span>
@@ -188,32 +185,6 @@ export function MonthBarChart({
             </BarWrapper>
           </BarChart>
         </ResponsiveContainer>
-      </div>
-
-      <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-        {chartData.map((day) => (
-          <button
-            key={day.date}
-            type="button"
-            className={cn(
-              "inline-flex items-center gap-1 px-2 py-1 rounded",
-              "bg-background border",
-              onBarClick && "cursor-pointer hover:bg-muted",
-            )}
-            onClick={() => onBarClick?.(day)}
-            style={{
-              borderColor: `var(--chart-${(chartData.indexOf(day) % 5) + 1})`,
-            }}
-          >
-            <span
-              className="w-2 h-2 rounded"
-              style={{
-                backgroundColor: `var(--chart-${(chartData.indexOf(day) % 5) + 1})`,
-              }}
-            />
-            {day.label}: {day.dwellHours}h ({day.workdayPercentage.toFixed(0)}%)
-          </button>
-        ))}
       </div>
     </div>
   );

@@ -152,22 +152,23 @@ export function PeriodHistoryContent({
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium">
-                Tempo Total Parado
+                Tempo Parado Médio
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold tabular-nums">
-                {(drilldown.totalDwellMinutes / 60).toFixed(1)}h
+                {(drilldown.averageDwellMinutes / 60).toFixed(1)}h
               </div>
               <p className="text-sm text-muted-foreground">
-                {drilldown.totalDwellMinutes} minutos
+                por motorista/dia · {Math.round(drilldown.averageDwellMinutes)}{" "}
+                minutos
               </p>
             </CardContent>
           </Card>
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium">
-                % da Jornada Padrão
+                % Média da Jornada Padrão
               </CardTitle>
             </CardHeader>
             <CardContent>
