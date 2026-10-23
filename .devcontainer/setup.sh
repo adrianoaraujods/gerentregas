@@ -22,7 +22,7 @@ fi
 echo "==> banco"
 bash .devcontainer/start.sh
 pnpm db:push
-pnpm db:seed
+pnpm db:demo:seed
 
 echo "==> skills do fluxo"
 for s in productivity/grill-me engineering/to-spec engineering/to-tickets engineering/implement-spec; do
