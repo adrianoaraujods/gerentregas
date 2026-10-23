@@ -50,8 +50,7 @@ export function buildDrilldownColumns(includeRoute: boolean) {
         </span>
       ),
     }),
-    columnHelper.accessor((row) => row.arrivalTime || row.departureTime, {
-      id: "data",
+    columnHelper.accessor("date", {
       meta: { variant: "text", label: "Data" },
       cell: ({ getValue }) => formatStopDate(getValue()),
     }),

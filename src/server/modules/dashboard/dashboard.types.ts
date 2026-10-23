@@ -13,7 +13,17 @@ export const getAggregationInputSchema = z.object({
 });
 export type GetAggregationInput = z.infer<typeof getAggregationInputSchema>;
 
-export const dayTimelineStopSchema = z.object({
+export const driverSummarySchema = z.object({
+  driverId: z.string(),
+  driverName: z.string(),
+});
+export type DriverSummary = z.infer<typeof driverSummarySchema>;
+
+export const drilldownStopSchema = z.object({
+  routeId: z.string(),
+  driverId: z.string(),
+  driverName: z.string(),
+  date: z.iso.datetime({ local: true }),
   stopId: z.string(),
   order: z.string(),
   pointId: z.string(),
@@ -22,11 +32,9 @@ export const dayTimelineStopSchema = z.object({
   arrivalTime: z.iso.datetime({ local: true }).nullable(),
   departureTime: z.iso.datetime({ local: true }).nullable(),
   dwellMinutes: z.number().nonnegative(),
-  startHour: z.number().min(0).max(24),
-  dwellHours: z.number().nonnegative(),
   workdayPercentage: z.number().nonnegative(),
 });
-export type DayTimelineStop = z.infer<typeof dayTimelineStopSchema>;
+export type DrilldownStop = z.infer<typeof drilldownStopSchema>;
 
 export const dailyAggregationSchema = z.object({
   date: z.iso.datetime({ local: true }),
@@ -58,7 +66,8 @@ export const aggregationOutputSchema = z.discriminatedUnion("periodType", [
   z.object({
     periodType: z.literal("day"),
     date: z.iso.datetime({ local: true }),
-    stops: z.array(dayTimelineStopSchema),
+    stops: z.array(drilldownStopSchema),
+    drivers: z.array(driverSummarySchema),
     driverCount: z.number().int().nonnegative(),
     totalDwellMinutes: z.number().nonnegative(),
     averageDwellMinutes: z.number().nonnegative(),
@@ -97,24 +106,9 @@ export const drilldownInputSchema = z.object({
 });
 export type DrilldownInput = z.infer<typeof drilldownInputSchema>;
 
-export const drilldownStopSchema = z.object({
-  routeId: z.string(),
-  driverId: z.string(),
-  driverName: z.string(),
-  stopId: z.string(),
-  order: z.string(),
-  pointId: z.string(),
-  pointName: z.string(),
-  address: z.string(),
-  arrivalTime: z.iso.datetime({ local: true }).nullable(),
-  departureTime: z.iso.datetime({ local: true }).nullable(),
-  dwellMinutes: z.number().nonnegative(),
-  workdayPercentage: z.number().nonnegative(),
-});
-export type DrilldownStop = z.infer<typeof drilldownStopSchema>;
-
 export const drilldownOutputSchema = z.object({
   stops: z.array(drilldownStopSchema),
+  drivers: z.array(driverSummarySchema),
   driverCount: z.number().int().nonnegative(),
   totalDwellMinutes: z.number().nonnegative(),
   averageDwellMinutes: z.number().nonnegative(),

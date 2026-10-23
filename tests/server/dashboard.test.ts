@@ -254,6 +254,9 @@ describe("DashboardService", () => {
       expect(result.stops[0].dwellMinutes).toBe(0);
       expect(result.stops[1].dwellMinutes).toBe(60);
       expect(result.stops[2].dwellMinutes).toBe(60);
+      expect(result.stops.every((s) => s.driverId === driverId)).toBe(true);
+      expect(result.stops[0].driverName).toBe("Driver Test");
+      expect(result.drivers).toEqual([{ driverId, driverName: "Driver Test" }]);
       expect(result.totalDwellMinutes).toBe(120);
       expect(result.workdayPercentage).toBe(25);
     });
@@ -281,6 +284,8 @@ describe("DashboardService", () => {
       // 120 (driver 1) + 60 (driver 2) + 0 (driver 3, roteiro sem paradas concluídas)
       expect(result.totalDwellMinutes).toBe(180);
       expect(result.driverCount).toBe(3);
+      expect(result.drivers).toHaveLength(3);
+      expect(new Set(result.drivers.map((d) => d.driverId)).size).toBe(3);
       expect(result.averageDwellMinutes).toBe(60);
       expect(result.workdayPercentage).toBe(12.5);
     });
@@ -465,8 +470,8 @@ describe("DashboardService", () => {
         date: queryDate.toISOString(),
       });
 
-      // 120 (motorista 1) + 30 (motorista 2)
-      expect(result.stops.length).toBe(3);
+      // 120 (motorista 1) + 30 (motorista 2), origins included with 0 dwell
+      expect(result.stops.length).toBe(5);
       expect(result.totalDwellMinutes).toBe(150);
       expect(result.driverCount).toBe(2);
       expect(result.averageDwellMinutes).toBe(75);
@@ -482,7 +487,9 @@ describe("DashboardService", () => {
         date: testDate.toISOString(),
       });
 
-      expect(result.stops.length).toBe(2);
+      expect(result.stops.length).toBe(3);
+      expect(result.stops[0].order).toBe("1");
+      expect(result.stops[0].dwellMinutes).toBe(0);
       expect(result.stops[0]).toHaveProperty("routeId");
       expect(result.stops[0]).toHaveProperty("driverName");
       expect(result.stops[0]).toHaveProperty("pointName");
@@ -491,8 +498,8 @@ describe("DashboardService", () => {
       expect(result.stops[0]).toHaveProperty("departureTime");
       expect(result.stops[0]).toHaveProperty("dwellMinutes");
       expect(result.stops[0]).toHaveProperty("workdayPercentage");
-      expect(result.stops[0].dwellMinutes).toBe(60);
       expect(result.stops[1].dwellMinutes).toBe(60);
+      expect(result.stops[2].dwellMinutes).toBe(60);
       expect(result.totalDwellMinutes).toBe(120);
     });
   });
@@ -511,6 +518,7 @@ describe("DashboardService", () => {
         "Data,Motorista,Ordem da Parada,Ponto,Endereço,Chegada,Saída,Tempo Parado (min),% Jornada Padrão",
       );
       expect(result.csv).toContain("Entrega 1");
+      expect(result.csv).toContain('"Origem"');
       expect(result.csv).toContain(",60,12.50");
       expect(result.filename).toMatch(
         /dashboard-export-day-\d{4}-\d{2}-\d{2}\.csv/,
@@ -651,16 +659,34 @@ describe("DashboardRepository", () => {
     ]);
   });
 
-  it("calculates dwell time per stop (RN02) and excludes the origin (RN03)", async () => {
+  it("returns every stop of the route (Origin and unconcluded included)", async () => {
+    await db.insert(stop).values({
+      routeId,
+      pointId: pointId1,
+      order: "4",
+      addressSnapshot: "Sem saída registrada",
+      latitudeSnapshot: -23.55,
+      longitudeSnapshot: -46.63,
+      arrivalAt: new Date(testDate.getTime() + 240 * 60000),
+    });
+
     const queryDate = new Date(testDate);
     queryDate.setHours(0, 0, 0, 0);
-    const result = await dashboardRepository.getDayTimeline(queryDate);
+    const result = await dashboardRepository.getDrilldown({
+      periodType: "day",
+      date: queryDate,
+    });
 
-    expect(result.stops).toHaveLength(3);
+    expect(result.stops).toHaveLength(4);
     expect(result.stops[0].order).toBe("1");
     expect(result.stops[0].dwellMinutes).toBe(0);
+    expect(result.stops[0].arrivalTime).toBeNull();
     expect(result.stops[1].dwellMinutes).toBe(60);
     expect(result.stops[2].dwellMinutes).toBe(60);
+    expect(result.stops[3].dwellMinutes).toBe(0);
+    expect(result.stops[0].driverId).toBe(driverId);
+    expect(result.stops[0].driverName).toBe("Driver Test");
+    expect(result.drivers).toEqual([{ driverId, driverName: "Driver Test" }]);
     expect(result.totalDwellMinutes).toBe(120);
   });
 });

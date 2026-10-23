@@ -8,7 +8,6 @@ import type {
   AggregationOutput,
   CsvExportOutput,
   DailyAggregation,
-  DayTimelineStop,
   DrilldownOutput,
   DrilldownStop,
   GetAggregationInput,
@@ -24,8 +23,6 @@ export class DashboardService {
   constructor(private readonly repository: DashboardRepository) {}
 
   async getAggregation(input: GetAggregationInput): Promise<AggregationOutput> {
-    const workdayMinutes = await this.repository.getStandardWorkdayDuration();
-
     if (input.periodType === "day") {
       const date = toDate(input.date);
       if (!date) {
@@ -33,39 +30,14 @@ export class DashboardService {
           "Data é obrigatória para visualização por dia.",
         );
       }
-      const { stops, totalDwellMinutes, driverCount, routeCount } =
-        await this.repository.getDayTimeline(date);
-
-      const enrichedStops: DayTimelineStop[] = stops.map((s) => ({
-        ...s,
-        arrivalTime: s.arrivalTime?.toISOString() ?? null,
-        departureTime: s.departureTime?.toISOString() ?? null,
-        workdayPercentage: computeWorkdayPercentage(
-          s.dwellMinutes,
-          workdayMinutes,
-        ),
-      }));
-
-      const averageDwellMinutes = averageDwellPerRoute(
-        totalDwellMinutes,
-        routeCount,
-      );
-
-      const workdayPercentage = computeWorkdayPercentage(
-        averageDwellMinutes,
-        workdayMinutes,
-      );
-
       return {
         periodType: "day",
         date: date.toISOString(),
-        stops: enrichedStops,
-        driverCount,
-        totalDwellMinutes,
-        averageDwellMinutes,
-        workdayPercentage,
+        ...(await this.getDrilldown(input)),
       };
     }
+
+    const workdayMinutes = await this.repository.getStandardWorkdayDuration();
 
     if (input.periodType === "month") {
       if (!input.year || !input.month) {
@@ -164,11 +136,12 @@ export class DashboardService {
       dateTo: toDate(input.dateTo),
     };
 
-    const { stops, totalDwellMinutes, driverCount, routeCount } =
+    const { stops, drivers, totalDwellMinutes, driverCount, routeCount } =
       await this.repository.getDrilldown(drilldownInput);
 
     const enrichedStops: DrilldownStop[] = stops.map((s) => ({
       ...s,
+      date: s.date.toISOString(),
       arrivalTime: s.arrivalTime?.toISOString() ?? null,
       departureTime: s.departureTime?.toISOString() ?? null,
       workdayPercentage: computeWorkdayPercentage(
@@ -189,6 +162,7 @@ export class DashboardService {
 
     return {
       stops: enrichedStops,
+      drivers,
       driverCount,
       totalDwellMinutes,
       averageDwellMinutes,

@@ -31,121 +31,6 @@ export class DashboardRepository {
     return row?.standardWorkdayDuration ?? this.getStandardWorkdayMinutes();
   }
 
-  async getDayTimeline(date: Date): Promise<{
-    stops: Array<{
-      stopId: string;
-      order: string;
-      pointId: string;
-      pointName: string;
-      address: string;
-      arrivalTime: Date | null;
-      departureTime: Date | null;
-      dwellMinutes: number;
-      startHour: number;
-      dwellHours: number;
-    }>;
-    totalDwellMinutes: number;
-    driverCount: number;
-    routeCount: number;
-  }> {
-    const startOfDay = new Date(date);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(date);
-    endOfDay.setHours(23, 59, 59, 999);
-
-    const routesForDay = await this.db
-      .select({ id: route.id, driverId: route.driverId })
-      .from(route)
-      .where(this.routeRangeFilter(startOfDay, endOfDay));
-
-    if (routesForDay.length === 0) {
-      return {
-        stops: [],
-        totalDwellMinutes: 0,
-        driverCount: 0,
-        routeCount: 0,
-      };
-    }
-
-    const routeIds = routesForDay.map((r) => r.id);
-
-    const stopsData = await this.db
-      .select({
-        stopId: stop.id,
-        routeId: stop.routeId,
-        order: stop.order,
-        pointId: stop.pointId,
-        pointName: point.name,
-        address: point.address,
-        arrivalAt: stop.arrivalAt,
-        departureAt: stop.departureAt,
-      })
-      .from(stop)
-      .leftJoin(point, eq(stop.pointId, point.id))
-      .where(and(inArray(stop.routeId, routeIds), isNull(stop.deletedAt)))
-      .orderBy(stop.routeId, stop.order);
-
-    const stopsByRoute = new Map<string, typeof stopsData>();
-    for (const s of stopsData) {
-      if (!stopsByRoute.has(s.routeId)) {
-        stopsByRoute.set(s.routeId, []);
-      }
-      stopsByRoute.get(s.routeId)?.push(s);
-    }
-
-    const result: Array<{
-      stopId: string;
-      order: string;
-      pointId: string;
-      pointName: string;
-      address: string;
-      arrivalTime: Date | null;
-      departureTime: Date | null;
-      dwellMinutes: number;
-      startHour: number;
-      dwellHours: number;
-    }> = [];
-
-    let totalDwellMinutes = 0;
-
-    for (const [, routeStops] of stopsByRoute) {
-      for (const currentStop of routeStops) {
-        const arrivalTime = currentStop.arrivalAt;
-        const departureTime = currentStop.departureAt;
-
-        const dwellMinutes = this.computeDwellMinutes(currentStop);
-        totalDwellMinutes += dwellMinutes;
-
-        const startHour = arrivalTime
-          ? arrivalTime.getHours() + arrivalTime.getMinutes() / 60
-          : departureTime
-            ? departureTime.getHours() + departureTime.getMinutes() / 60
-            : 0;
-        const dwellHours = dwellMinutes / 60;
-
-        result.push({
-          stopId: currentStop.stopId,
-          order: currentStop.order,
-          pointId: currentStop.pointId,
-          pointName: currentStop.pointName ?? "Ponto desconhecido",
-          address: currentStop.address ?? "Endereço não informado",
-          arrivalTime,
-          departureTime,
-          dwellMinutes,
-          startHour,
-          dwellHours,
-        });
-      }
-    }
-
-    return {
-      stops: result,
-      totalDwellMinutes,
-      driverCount: new Set(routesForDay.map((r) => r.driverId)).size,
-      routeCount: routesForDay.length,
-    };
-  }
-
   private routeRangeFilter(startDate: Date, endDate: Date) {
     return and(
       sql`${route.date} >= ${startDate.toISOString()}`,
@@ -316,6 +201,7 @@ export class DashboardRepository {
       routeId: string;
       driverId: string;
       driverName: string;
+      date: Date;
       stopId: string;
       order: string;
       pointId: string;
@@ -325,6 +211,7 @@ export class DashboardRepository {
       departureTime: Date | null;
       dwellMinutes: number;
     }>;
+    drivers: Array<{ driverId: string; driverName: string }>;
     totalDwellMinutes: number;
     driverCount: number;
     routeCount: number;
@@ -350,7 +237,13 @@ export class DashboardRepository {
       endDate = new Date(input.dateTo);
       endDate.setHours(23, 59, 59, 999);
     } else {
-      return { stops: [], totalDwellMinutes: 0, driverCount: 0, routeCount: 0 };
+      return {
+        stops: [],
+        drivers: [],
+        totalDwellMinutes: 0,
+        driverCount: 0,
+        routeCount: 0,
+      };
     }
 
     const routesInPeriod = await this.db
@@ -365,11 +258,32 @@ export class DashboardRepository {
       .where(this.routeRangeFilter(startDate, endDate));
 
     if (routesInPeriod.length === 0) {
-      return { stops: [], totalDwellMinutes: 0, driverCount: 0, routeCount: 0 };
+      return {
+        stops: [],
+        drivers: [],
+        totalDwellMinutes: 0,
+        driverCount: 0,
+        routeCount: 0,
+      };
     }
 
+    const routeMap = new Map(
+      routesInPeriod.map((r) => [
+        r.routeId,
+        { ...r, driverName: r.driverName ?? "Motorista desconhecido" },
+      ]),
+    );
+
+    const drivers = [
+      ...new Map(
+        [...routeMap.values()].map((r) => [
+          r.driverId,
+          { driverId: r.driverId, driverName: r.driverName },
+        ]),
+      ).values(),
+    ];
+
     const routeIds = routesInPeriod.map((r) => r.routeId);
-    const routeMap = new Map(routesInPeriod.map((r) => [r.routeId, r]));
 
     const stopsData = await this.db
       .select({
@@ -384,15 +298,7 @@ export class DashboardRepository {
       })
       .from(stop)
       .leftJoin(point, eq(stop.pointId, point.id))
-      .where(
-        and(
-          inArray(stop.routeId, routeIds),
-          isNull(stop.deletedAt),
-          sql`${stop.order} != '1'`,
-          sql`${stop.arrivalAt} IS NOT NULL`,
-          sql`${stop.departureAt} IS NOT NULL`,
-        ),
-      )
+      .where(and(inArray(stop.routeId, routeIds), isNull(stop.deletedAt)))
       .orderBy(stop.routeId, stop.order);
 
     const stopsByRoute = new Map<string, typeof stopsData>();
@@ -407,6 +313,7 @@ export class DashboardRepository {
       routeId: string;
       driverId: string;
       driverName: string;
+      date: Date;
       stopId: string;
       order: string;
       pointId: string;
@@ -423,7 +330,9 @@ export class DashboardRepository {
       const routeInfo = routeMap.get(routeId);
       if (!routeInfo) continue;
 
-      for (const currentStop of routeStops) {
+      for (const currentStop of routeStops.sort((a, b) =>
+        a.order.localeCompare(b.order, undefined, { numeric: true }),
+      )) {
         const arrivalTime = currentStop.arrivalAt;
         const departureTime = currentStop.departureAt;
         const dwellMinutes = this.computeDwellMinutes(currentStop);
@@ -432,7 +341,8 @@ export class DashboardRepository {
         result.push({
           routeId,
           driverId: routeInfo.driverId,
-          driverName: routeInfo.driverName ?? "Motorista desconhecido",
+          driverName: routeInfo.driverName,
+          date: routeInfo.date,
           stopId: currentStop.stopId,
           order: currentStop.order,
           pointId: currentStop.pointId,
@@ -447,8 +357,9 @@ export class DashboardRepository {
 
     return {
       stops: result,
+      drivers,
       totalDwellMinutes,
-      driverCount: new Set(routesInPeriod.map((r) => r.driverId)).size,
+      driverCount: drivers.length,
       routeCount: routesInPeriod.length,
     };
   }
@@ -478,11 +389,7 @@ export class DashboardRepository {
     ];
 
     const rows = stops.map((s) => {
-      const dateStr = s.arrivalTime
-        ? s.arrivalTime.toISOString().split("T")[0]
-        : s.departureTime
-          ? s.departureTime.toISOString().split("T")[0]
-          : "";
+      const dateStr = s.date.toISOString().split("T")[0];
       const arrivalStr = s.arrivalTime
         ? s.arrivalTime.toISOString().replace("T", " ").substring(0, 19)
         : "";

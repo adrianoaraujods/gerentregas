@@ -9,17 +9,20 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api/client";
+import { workdayPercentage } from "@/lib/route-metrics";
 import type { GetAggregationInput } from "@/server/modules/dashboard";
 import { CustomBarChart, MonthBarChart } from "./bar-charts";
 import { CsvExportButton } from "./csv-export";
-import { DayTimelineChart } from "./day-timeline-chart";
 import { DrilldownModal } from "./drilldown-modal";
+import { DriverDwellChart } from "./driver-dwell-chart";
 import { PeriodSelector } from "./period-selector";
 
 type PeriodType = "day" | "month" | "custom";
 
 interface DashboardStop {
   stopId: string;
+  driverId: string;
+  driverName: string;
   order: string;
   pointId: string;
   pointName: string;
@@ -27,8 +30,6 @@ interface DashboardStop {
   arrivalTime: string | null;
   departureTime: string | null;
   dwellMinutes: number;
-  startHour: number;
-  dwellHours: number;
   workdayPercentage: number;
 }
 
@@ -36,6 +37,7 @@ interface DrilldownStop {
   routeId: string;
   driverId: string;
   driverName: string;
+  date: string;
   stopId: string;
   order: string;
   pointId: string;
@@ -63,6 +65,7 @@ interface DashboardData {
   dateFrom?: string;
   dateTo?: string;
   stops?: DashboardStop[];
+  drivers?: Array<{ driverId: string; driverName: string }>;
   days?: DashboardDay[];
   totalDwellMinutes: number;
   averageDwellMinutes: number;
@@ -86,9 +89,8 @@ export function DashboardContent() {
   const [drilldownStops, setDrilldownStops] = React.useState<DrilldownStop[]>(
     [],
   );
-  const [drilldownAverage, setDrilldownAverage] = React.useState(0);
+  const [drilldownTotal, setDrilldownTotal] = React.useState(0);
   const [drilldownWorkdayPct, setDrilldownWorkdayPct] = React.useState(0);
-  const [drilldownDriverCount, setDrilldownDriverCount] = React.useState(0);
   const [workdayMinutes, setWorkdayMinutes] = React.useState(480);
 
   const utils = api.useUtils();
@@ -135,13 +137,16 @@ export function DashboardContent() {
     if (workdayData) setWorkdayMinutes(workdayData.standardWorkdayDuration);
   }, [workdayData]);
 
-  const handleDrilldown = async (periodKey: string) => {
+  const handleDrilldown = async (
+    periodKey?: string,
+    driver?: { driverId: string; driverName: string },
+  ) => {
     let drilldownInput: GetAggregationInput;
 
     if (periodType === "month" || periodType === "custom") {
       drilldownInput = {
         periodType: "day",
-        date: new Date(periodKey).toISOString(),
+        date: new Date(periodKey ?? date).toISOString(),
       };
     } else {
       drilldownInput = { periodType: "day", date: date.toISOString() };
@@ -157,16 +162,30 @@ export function DashboardContent() {
 
     try {
       const data = await promise;
-      setDrilldownStops(data.stops);
-      setDrilldownAverage(data.averageDwellMinutes);
-      setDrilldownDriverCount(data.driverCount);
-      setDrilldownWorkdayPct(data.workdayPercentage);
+      const stops = driver
+        ? data.stops.filter((s) => s.driverId === driver.driverId)
+        : data.stops;
+      const totalDwellMinutes = stops.reduce(
+        (sum, s) => sum + s.dwellMinutes,
+        0,
+      );
+      const dayLabel = format(
+        new Date(drilldownInput.date ?? new Date().toISOString()),
+        "dd/MM/yyyy",
+        { locale: ptBR },
+      );
+
+      setDrilldownStops(stops);
+      setDrilldownTotal(totalDwellMinutes);
+      setDrilldownWorkdayPct(
+        driver
+          ? workdayPercentage(totalDwellMinutes, workdayMinutes)
+          : data.workdayPercentage,
+      );
       setDrilldownTitle(
-        `Detalhes do dia ${format(
-          new Date(drilldownInput.date ?? new Date().toISOString()),
-          "dd/MM/yyyy",
-          { locale: ptBR },
-        )}`,
+        driver
+          ? `Rota de ${driver.driverName} — ${dayLabel}`
+          : `Detalhes do dia ${dayLabel}`,
       );
       setDrilldownOpen(true);
     } catch (error) {
@@ -182,9 +201,10 @@ export function DashboardContent() {
     switch (periodType) {
       case "day":
         return (
-          <DayTimelineChart
+          <DriverDwellChart
+            drivers={aggregation?.drivers || []}
             stops={aggregation?.stops || []}
-            onStopClick={(stop) => handleDrilldown(stop.stopId)}
+            onDriverClick={(driver) => handleDrilldown(undefined, driver)}
           />
         );
       case "month":
@@ -267,7 +287,9 @@ export function DashboardContent() {
 
     if (
       !aggregation ||
-      (aggregation.stops?.length === 0 && aggregation.days?.length === 0)
+      (aggregation.stops?.length === 0 &&
+        aggregation.drivers?.length === 0 &&
+        aggregation.days?.length === 0)
     ) {
       return (
         <Card>
@@ -387,10 +409,8 @@ export function DashboardContent() {
         onOpenChange={setDrilldownOpen}
         title={drilldownTitle}
         stops={drilldownStops}
-        averageDwellMinutes={drilldownAverage}
-        driverCount={drilldownDriverCount}
+        totalDwellMinutes={drilldownTotal}
         workdayPercentage={drilldownWorkdayPct}
-        onExportCSV={handleCsvExport}
       />
     </div>
   );

@@ -1,6 +1,5 @@
 "use client";
 import { DataTable, useAppTable } from "@/components/data-table";
-import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -17,10 +16,8 @@ interface DrilldownModalProps {
   onOpenChange: (open: boolean) => void;
   title: string;
   stops: DrilldownStop[];
-  averageDwellMinutes: number;
-  driverCount: number;
+  totalDwellMinutes: number;
   workdayPercentage: number;
-  onExportCSV?: () => void;
 }
 
 export function DrilldownModal({
@@ -28,10 +25,8 @@ export function DrilldownModal({
   onOpenChange,
   title,
   stops,
-  averageDwellMinutes,
-  driverCount,
+  totalDwellMinutes,
   workdayPercentage,
-  onExportCSV,
 }: DrilldownModalProps) {
   const table = useAppTable({
     data: stops,
@@ -43,22 +38,11 @@ export function DrilldownModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent size="xl">
         <DialogHeader className="pr-8">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <DialogTitle>{title}</DialogTitle>
-              <DialogDescription>
-                {stops.length} parada(s) • média de{" "}
-                {Math.round(averageDwellMinutes)} min por motorista •{" "}
-                {driverCount} {driverCount === 1 ? "motorista" : "motoristas"} •{" "}
-                {workdayPercentage.toFixed(1)}% da jornada
-              </DialogDescription>
-            </div>
-            {onExportCSV && (
-              <Button variant="outline" size="sm" onClick={onExportCSV}>
-                Exportar CSV
-              </Button>
-            )}
-          </div>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>
+            {stops.length} parada(s) • {totalDwellMinutes} min parado •{" "}
+            {workdayPercentage.toFixed(1)}% da jornada
+          </DialogDescription>
         </DialogHeader>
 
         <div className="mt-4 min-h-0 overflow-y-auto">

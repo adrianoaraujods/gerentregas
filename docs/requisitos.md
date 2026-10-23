@@ -129,10 +129,10 @@ Regras complementares implementadas no serviço de rotas:
 | RF40 | Registrar chegada e saída em modo offline, mantendo os registros em fila local e sincronizando automaticamente ao voltar a conexão | Alta |
 | RF41 | Enviar a fila offline em lote, recebendo resposta item a item (aceitos, rejeitados com motivo e resumo do lote) | Alta |
 | RF42 | Reprocessar um registro rejeitado ou descartá-lo da fila | Média |
-| RF43 | Consultar o dashboard do dia com linha do tempo das paradas (chegada, saída, tempo parado e percentual da jornada padrão) | Alta |
+| RF43 | Consultar o dashboard do dia com barras empilhadas por motorista, exibindo o tempo parado de cada parada (chegada, saída e percentual da jornada padrão no tooltip) | Alta |
 | RF44 | Consultar o dashboard do mês com a agregação diária de tempo parado e quantidade de paradas | Alta |
 | RF45 | Consultar o dashboard de um período personalizado com a agregação diária entre duas datas | Alta |
-| RF46 | Abrir o detalhamento (drilldown) de um dia, com motorista, ponto, endereço, chegada, saída e tempo parado de cada parada | Alta |
+| RF46 | Abrir o detalhamento (drilldown) da rota de um motorista no dia, com ponto, endereço, chegada, saída e tempo parado de cada parada | Alta |
 | RF47 | Exportar o relatório do período selecionado em CSV, com nome de arquivo sugerido pelo período | Média |
 | RF48 | Consultar a duração da jornada padrão configurada | Baixa |
 | RF49 | Consultar os parâmetros do sistema (preço do combustível e jornada padrão) | Alta |
